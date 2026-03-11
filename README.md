@@ -6,14 +6,14 @@ A full-stack task management application built with React, Node.js, and PostgreS
 
 Follow these steps if you have just cloned the repository to set up your local environment.
 
-### 1. Backend Dependencies
+### 1. Open Backend Terminal: Download Dependencies
 
 ```
 cd backend
 npm install
 ```
 
-### 2. Frontend Dependencies
+### 2. Open Frontend Terminal: Download Dependencies
 
 #### Note: Start another terminal, will be useful later
 
@@ -28,17 +28,15 @@ npm install
 
 Use this method for active coding. Open two separate terminal windows:
 
-**Terminal 1 (Backend):**
+**In Backend Terminal:**
 
 ```
-cd backend
 npm run dev
 ```
 
-**Terminal 2 (Frontend):**
+**In Frontend Terminal:**
 
 ```
-cd frontend
 npm run dev
 ```
 
