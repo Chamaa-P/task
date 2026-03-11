@@ -15,7 +15,7 @@ npm install
 
 ### 2. Frontend Dependencies
 
-# Note: We use the --legacy-peer-deps flag for compatibility.
+#### Note: We use the --legacy-peer-deps flag for compatibility.
 
 ```
 cd ../frontend
@@ -46,7 +46,7 @@ npm run dev
 
 Use this to run the entire stack (Frontend, Backend, and Database) in isolated containers. Run these commands from the root folder:
 
-# Stop any existing containers, force a clean build, start the stack
+#### Stop any existing containers, force a clean build, start the stack
 
 ```
 docker-compose down
