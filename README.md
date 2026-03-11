@@ -19,7 +19,7 @@ npm install
 
 ```
 cd ../frontend
-npm install --legacy-peer-deps
+npm install
 ```
 
 ## 🚀 How to Run the Project
