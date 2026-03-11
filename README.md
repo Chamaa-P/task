@@ -8,15 +8,19 @@ Follow these steps if you have just cloned the repository to set up your local e
 
 ### 1. Backend Dependencies
 
+```
 cd backend
 npm install
+```
 
 ### 2. Frontend Dependencies
 
 # Note: We use the --legacy-peer-deps flag for compatibility.
 
+```
 cd ../frontend
 npm install --legacy-peer-deps
+```
 
 ## 🚀 How to Run the Project
 
@@ -25,28 +29,30 @@ npm install --legacy-peer-deps
 Use this method for active coding. Open two separate terminal windows:
 
 **Terminal 1 (Backend):**
+
+```
 cd backend
 npm run dev
+```
 
 **Terminal 2 (Frontend):**
+
+```
 cd frontend
 npm run dev
+```
 
 ### Option B: Docker Environment
 
 Use this to run the entire stack (Frontend, Backend, and Database) in isolated containers. Run these commands from the root folder:
 
-# Stop any existing containers to avoid conflicts
+# Stop any existing containers, force a clean build, start the stack
 
+```
 docker-compose down
-
-# Force a clean build of the backend to re-compile TypeScript
-
 docker-compose build --no-cache backend
-
-# Start the stack
-
 docker-compose up
+```
 
 ## ⚠️ Critical Troubleshooting for Mac Users
 
