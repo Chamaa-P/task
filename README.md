@@ -29,6 +29,7 @@ Use this method for active coding. Open two separate terminal windows:
 **In Backend Terminal:**
 
 ```
+npm run build
 npm run dev
 ```
 
