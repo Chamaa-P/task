@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: taskuser
+      POSTGRES_PASSWORD: taskpass
+      POSTGRES_DB: taskcollab
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - task-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      placement:
+        constraints:
+          - node.role == manager
+
+  backend:
+    image: task-collab-backend:latest
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://taskuser:taskpass@postgres:5432/taskcollab
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 5000
+    networks:
+      - task-network
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    depends_on:
+      - postgres
+
+  frontend:
+    image: task-collab-frontend:latest
+    environment:
+      VITE_API_URL: http://backend:5000
+    ports:
+      - "80:80"
+    networks:
+      - task-network
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    depends_on:
+      - backend
+
+  visualizer:
+    image: dockersamples/visualizer:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - task-network
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  task-network:
+    driver: overlay
+    attachable: true
