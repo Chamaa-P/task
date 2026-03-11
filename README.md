@@ -24,8 +24,6 @@ npm install
 
 ## 🚀 How to Run the Project
 
-### Option A: Local Development (Hot Reloading)
-
 Use this method for active coding. Open two separate terminal windows:
 
 **In Backend Terminal:**
@@ -40,11 +38,11 @@ npm run dev
 npm run dev
 ```
 
-### Option B: Docker Environment
-
 Use this to run the entire stack (Frontend, Backend, and Database) in isolated containers. Run these commands from the root folder:
 
 #### Stop any existing containers, force a clean build, start the stack
+
+**In Root /task Terminal:**
 
 ```
 docker-compose down
