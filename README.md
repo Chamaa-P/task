@@ -57,7 +57,6 @@ If you encounter "Port already in use" errors, check the following:
 
 1. Port 5432 (Postgres): Your local Postgres is likely running. Stop it with 'brew services stop postgresql' or quit Postgres.app.
 2. Port 5000 (Backend): macOS uses this for AirPlay. Go to System Settings > General > AirPlay & Handoff and turn off AirPlay Receiver.
-3. Module Not Found (/app/dist/index.js): If the Docker backend crashes, run the 'build --no-cache' command listed above to force a fresh compilation.
 
 ## 📁 Project Structure
 
