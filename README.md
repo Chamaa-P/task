@@ -15,10 +15,10 @@ npm install
 
 ### 2. Frontend Dependencies
 
-#### Note: We use the --legacy-peer-deps flag for compatibility.
+#### Note: Start another terminal, will be useful later
 
 ```
-cd ../frontend
+cd frontend
 npm install
 ```
 
