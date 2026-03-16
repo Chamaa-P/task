@@ -60,6 +60,93 @@ If you encounter "Port already in use" errors, check the following:
 
 ## 📁 Project Structure
 
-- /frontend: React + Vite + Tailwind CSS
-- /backend: Node.js + Express + Sequelize (PostgreSQL)
-- /docker-compose.yml: Container orchestration for the full stack
+- **/frontend**: React + Vite + Tailwind CSS
+- **/backend**: Node.js + Express + Sequelize (PostgreSQL)
+- **/database**: PostgreSQL container configuration
+- **docker-compose.yml**: Production container orchestration
+- **docker-compose.dev.yml**: Development with hot reload
+- **docker-compose.swarm.yml**: Docker Swarm orchestration
+- **docker-compose.digitalocean.yml**: DigitalOcean Swarm deployment
+
+## 🚢 Deployment Options
+
+This application can be deployed in multiple ways:
+
+### Option 1: Fly.io (PaaS Deployment)
+Deploy to Fly.io with persistent volumes.
+
+📖 **Guide**: See [FLY_DEPLOYMENT.md](FLY_DEPLOYMENT.md)
+
+**Features:**
+- ✅ Edge/PaaS platform
+- ✅ Fly Volumes for PostgreSQL persistence
+- ✅ Multi-region deployment capability
+- ✅ Automatic HTTPS
+
+**Quick Start:**
+```bash
+cd database && fly launch
+cd ../backend && fly launch
+cd ../frontend && fly launch
+```
+
+### Option 2: DigitalOcean with Docker Swarm (Orchestration)
+Deploy to DigitalOcean droplets using Docker Swarm for orchestration.
+
+📖 **Guide**: See [DIGITALOCEAN_SWARM_DEPLOYMENT.md](DIGITALOCEAN_SWARM_DEPLOYMENT.md)
+
+**Features:**
+- ✅ Docker Swarm orchestration (3-node cluster)
+- ✅ Service replication and load balancing
+- ✅ DigitalOcean Volumes for persistence
+- ✅ High availability and auto-recovery
+- ✅ Rolling updates
+
+**Quick Start:**
+```powershell
+# Update configuration in deploy-swarm.ps1, then:
+.\deploy-swarm.ps1 -Action full-deploy
+```
+
+**Quick Reference:** [SWARM_QUICK_REFERENCE.md](SWARM_QUICK_REFERENCE.md)
+
+### Local Development Modes
+
+**Development Mode** (Hot reload):
+```bash
+docker-compose -f docker-compose.dev.yml up
+```
+
+**Production Mode** (Local):
+```bash
+docker-compose up
+```
+
+**Swarm Mode** (Local testing):
+```bash
+docker swarm init
+docker stack deploy -c docker-compose.swarm.yml taskcollab
+```
+
+## 🏗 Architecture
+
+### Services
+- **PostgreSQL**: Relational database with persistent storage
+- **Backend API**: Node.js/Express REST API with WebSocket support
+- **Frontend**: React SPA with Vite build system
+- **Visualizer** (Swarm only): Visual representation of service distribution
+
+### Persistent Storage
+- **Local**: Docker volumes
+- **Fly.io**: Fly Volumes mounted to PostgreSQL container
+- **DigitalOcean**: Block Storage Volume attached to Swarm manager
+
+### Orchestration
+- **Docker Compose**: Local multi-container orchestration
+- **Docker Swarm**: Production orchestration with:
+  - Backend: 3 replicas
+  - Frontend: 2 replicas
+  - PostgreSQL: 1 replica (on manager node)
+  - Automatic load balancing
+  - Rolling updates
+  - Health checks and auto-recovery

@@ -1,6 +1,7 @@
 import User from './User';
 import Project from './Project';
 import Task from './Task';
+import Assignee from './Assignee';
 
 // Define associations
 User.hasMany(Project, {
@@ -18,7 +19,7 @@ User.hasMany(Task, {
   as: 'createdTasks',
 });
 
-User.hasMany(Task, {
+Assignee.hasMany(Task, {
   foreignKey: 'assignedTo',
   as: 'assignedTasks',
 });
@@ -28,7 +29,7 @@ Task.belongsTo(User, {
   as: 'creator',
 });
 
-Task.belongsTo(User, {
+Task.belongsTo(Assignee, {
   foreignKey: 'assignedTo',
   as: 'assignee',
 });
@@ -43,4 +44,4 @@ Task.belongsTo(Project, {
   as: 'project',
 });
 
-export { User, Project, Task };
+export { User, Project, Task, Assignee };

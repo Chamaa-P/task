@@ -1,27 +1,21 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  addDays,
   addWeeks,
-  differenceInMinutes,
   eachDayOfInterval,
-  endOfDay,
   endOfWeek,
   format,
-  isWithinInterval,
-  max,
-  min,
   parseISO,
-  startOfDay,
   startOfWeek,
   subWeeks,
+  isSameDay,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import apiClient from '../lib/api';
 
-interface User {
+interface Assignee {
   id: number;
-  username: string;
+  name: string;
 }
 
 interface Project {
@@ -34,12 +28,11 @@ interface Task {
   id: number;
   title: string;
   description?: string;
-  startTime?: string;
-  endTime?: string;
+  dueDate?: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   projectId?: number;
   project?: Project;
-  assignee?: User;
+  assignee?: Assignee;
 }
 
 interface CalendarSegment {
@@ -47,8 +40,8 @@ interface CalendarSegment {
   dayIndex: number;
   top: number;
   height: number;
-  segmentStart: Date;
-  segmentEnd: Date;
+  startTime: string;
+  endTime: string;
   projectColor: string;
   projectName: string;
 }
@@ -57,6 +50,8 @@ const WEEK_STARTS_ON = 1;
 const START_HOUR = 6;
 const END_HOUR = 22;
 const HOUR_HEIGHT = 64;
+const TASK_START_HOUR = 20; // 8pm
+const TASK_DURATION_HOURS = 1.5; // 1.5 hours (until 9:30pm)
 
 export default function Calendar() {
   const [weekStartDate, setWeekStartDate] = useState<Date>(
@@ -101,74 +96,53 @@ export default function Calendar() {
   }, []);
 
   const scheduledSegments = useMemo<CalendarSegment[]>(() => {
-    const weekEndDate = addDays(weekStartDate, 7);
-
     return tasks
-      .filter((task) => task.startTime && task.endTime)
+      .filter((task) => task.dueDate)
       .flatMap((task) => {
-        const taskStart = parseISO(task.startTime!);
-        const taskEnd = parseISO(task.endTime!);
+        const dueDate = parseISO(task.dueDate!);
 
-        if (Number.isNaN(taskStart.getTime()) || Number.isNaN(taskEnd.getTime())) {
+        if (Number.isNaN(dueDate.getTime())) {
           return [];
         }
 
-        if (taskEnd <= taskStart) {
+        // Find which day of the week this task belongs to
+        const dayIndex = weekDays.findIndex((day) => isSameDay(day, dueDate));
+        
+        // If the due date is not in this week, skip it
+        if (dayIndex === -1) {
           return [];
         }
 
-        if (
-          !isWithinInterval(taskStart, {
-            start: subWeeks(weekStartDate, 1),
-            end: addWeeks(weekEndDate, 1),
-          }) &&
-          !isWithinInterval(taskEnd, {
-            start: weekStartDate,
-            end: weekEndDate,
-          })
-        ) {
-          return [];
-        }
+        // Calculate position: task starts at 8pm (20:00)
+        const minutesFromGridStart = (TASK_START_HOUR - START_HOUR) * 60;
+        const durationMinutes = TASK_DURATION_HOURS * 60;
 
-        return weekDays.flatMap((day, dayIndex) => {
-          const dayStart = startOfDay(day);
-          const dayEnd = endOfDay(day);
+        const top = (minutesFromGridStart / 60) * HOUR_HEIGHT;
+        const height = (durationMinutes / 60) * HOUR_HEIGHT;
 
-          const segmentStart = max([taskStart, dayStart]);
-          const segmentEnd = min([taskEnd, dayEnd]);
+        const project = task.projectId ? projectById[task.projectId] : undefined;
+        
+        // Calculate display times
+        const startHour = TASK_START_HOUR;
+        const endHour = TASK_START_HOUR + Math.floor(TASK_DURATION_HOURS);
+        const endMinutes = (TASK_DURATION_HOURS % 1) * 60;
+        const startTime = `${startHour}:00`;
+        const endTime = `${endHour}:${endMinutes.toString().padStart(2, '0')}`;
 
-          if (segmentEnd <= segmentStart) {
-            return [];
-          }
-
-          const minutesFromGridStart =
-            (segmentStart.getHours() - START_HOUR) * 60 + segmentStart.getMinutes();
-          const durationMinutes = differenceInMinutes(segmentEnd, segmentStart);
-
-          const top = Math.max(0, (minutesFromGridStart / 60) * HOUR_HEIGHT);
-          const height = Math.max(24, (durationMinutes / 60) * HOUR_HEIGHT);
-          const project = task.projectId ? projectById[task.projectId] : undefined;
-
-          return [
-            {
-              task,
-              dayIndex,
-              top,
-              height,
-              segmentStart,
-              segmentEnd,
-              projectColor: project?.color || task.project?.color || '#3B82F6',
-              projectName: project?.name || task.project?.name || 'General',
-            },
-          ];
-        });
-      })
-      .filter((segment) => segment.top < (END_HOUR - START_HOUR) * HOUR_HEIGHT);
-  }, [tasks, weekStartDate, weekDays, projectById]);
-
-  const unscheduledTasks = useMemo(() => {
-    return tasks.filter((task) => !task.startTime || !task.endTime);
-  }, [tasks]);
+        return [
+          {
+            task,
+            dayIndex,
+            top,
+            height,
+            startTime,
+            endTime,
+            projectColor: project?.color || task.project?.color || '#3B82F6',
+            projectName: project?.name || task.project?.name || 'General',
+          },
+        ];
+      });
+  }, [tasks, weekDays, projectById]);
 
   const weekTitle = `${format(weekDays[0], 'MMM d')} - ${format(weekDays[6], 'MMM d, yyyy')}`;
   const totalCalendarHeight = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
@@ -178,7 +152,7 @@ export default function Calendar() {
       <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Weekly Calendar</h1>
-          <p className="text-gray-600 mt-2">Browse any week and view tasks in exact time slots.</p>
+          <p className="text-gray-600 mt-2">View tasks on their due dates (scheduled at 8:00 PM - 9:30 PM)</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -259,7 +233,7 @@ export default function Calendar() {
                     .filter((segment) => segment.dayIndex === dayIndex)
                     .map((segment) => (
                       <div
-                        key={`${segment.task.id}-${segment.segmentStart.toISOString()}-${segment.dayIndex}`}
+                        key={`${segment.task.id}-${segment.dayIndex}`}
                         className="absolute left-1 right-1 rounded-md p-2 text-white shadow-sm overflow-hidden"
                         style={{
                           top: `${segment.top}px`,
@@ -269,12 +243,12 @@ export default function Calendar() {
                       >
                         <p className="text-xs font-semibold truncate">{segment.task.title}</p>
                         <p className="text-[11px] opacity-90 truncate">
-                          {format(segment.segmentStart, 'HH:mm')} - {format(segment.segmentEnd, 'HH:mm')}
+                          {segment.startTime} - {segment.endTime}
                         </p>
                         <p className="text-[11px] opacity-90 truncate">{segment.projectName}</p>
-                        {segment.task.assignee?.username && (
+                        {segment.task.assignee?.name && (
                           <p className="text-[11px] opacity-90 truncate">
-                            {segment.task.assignee.username}
+                            {segment.task.assignee.name}
                           </p>
                         )}
                       </div>
@@ -282,28 +256,6 @@ export default function Calendar() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </div>
-
-      <div className="card mt-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Unscheduled Tasks</h2>
-        {unscheduledTasks.length === 0 ? (
-          <p className="text-sm text-gray-500">All current tasks have start and end times.</p>
-        ) : (
-          <div className="space-y-2">
-            {unscheduledTasks.slice(0, 8).map((task) => (
-              <div
-                key={task.id}
-                className="flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 p-3"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{task.title}</p>
-                  <p className="text-xs text-gray-600">{task.project?.name || 'No project'}</p>
-                </div>
-                <span className="text-xs text-gray-500">Missing start/end time</span>
-              </div>
-            ))}
           </div>
         )}
       </div>

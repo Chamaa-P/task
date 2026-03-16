@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { Task, User, Project } from '../models';
+import { Task, User, Project, Assignee } from '../models';
 import { AuthRequest } from '../middleware/auth';
 import { TaskStatus, TaskPriority } from '../models/Task';
 
@@ -13,8 +13,6 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
       projectId,
       assignedTo,
       dueDate,
-      startTime,
-      endTime,
       estimatedHours,
       tags,
     } = req.body;
@@ -28,8 +26,6 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
       assignedTo,
       createdBy: req.user!.id,
       dueDate,
-      startTime,
-      endTime,
       estimatedHours,
       tags,
     });
@@ -38,7 +34,7 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
     const createdTask = await Task.findByPk(task.id, {
       include: [
         { model: User, as: 'creator', attributes: ['id', 'username', 'email'] },
-        { model: User, as: 'assignee', attributes: ['id', 'username', 'email'] },
+        { model: Assignee, as: 'assignee', attributes: ['id', 'name'] },
         { model: Project, as: 'project' },
       ],
     });
@@ -65,7 +61,7 @@ export const getTasks = async (req: AuthRequest, res: Response): Promise<void> =
       where,
       include: [
         { model: User, as: 'creator', attributes: ['id', 'username', 'email'] },
-        { model: User, as: 'assignee', attributes: ['id', 'username', 'email'] },
+        { model: Assignee, as: 'assignee', attributes: ['id', 'name'] },
         { model: Project, as: 'project' },
       ],
       order: [['createdAt', 'DESC']],
@@ -85,7 +81,7 @@ export const getTaskById = async (req: AuthRequest, res: Response): Promise<void
     const task = await Task.findByPk(id, {
       include: [
         { model: User, as: 'creator', attributes: ['id', 'username', 'email'] },
-        { model: User, as: 'assignee', attributes: ['id', 'username', 'email'] },
+        { model: Assignee, as: 'assignee', attributes: ['id', 'name'] },
         { model: Project, as: 'project' },
       ],
     });
@@ -119,7 +115,7 @@ export const updateTask = async (req: AuthRequest, res: Response): Promise<void>
     const updatedTask = await Task.findByPk(id, {
       include: [
         { model: User, as: 'creator', attributes: ['id', 'username', 'email'] },
-        { model: User, as: 'assignee', attributes: ['id', 'username', 'email'] },
+        { model: Assignee, as: 'assignee', attributes: ['id', 'name'] },
         { model: Project, as: 'project' },
       ],
     });

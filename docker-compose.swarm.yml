@@ -22,7 +22,7 @@ services:
           - node.role == manager
 
   backend:
-    image: task-collab-backend:latest
+    image: chamaap/task-collab-backend:latest
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://taskuser:taskpass@postgres:5432/taskcollab
@@ -51,7 +51,7 @@ services:
       - postgres
 
   frontend:
-    image: task-collab-frontend:latest
+    image: chamaap/task-collab-frontend:latest
     environment:
       VITE_API_URL: http://backend:5000
     ports:
@@ -85,8 +85,109 @@ services:
         constraints:
           - node.role == manager
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - task-network
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - task-network
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - task-network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - task-network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+
+  autoscaler:
+    image: chamaap/task-collab-autoscaler:latest
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      CHECK_INTERVAL: 30
+      SCALE_UP_THRESHOLD: 70
+      SCALE_DOWN_THRESHOLD: 30
+      COOLDOWN_PERIOD: 60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - task-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - prometheus
+
 volumes:
   postgres-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
     driver: local
 
 networks:

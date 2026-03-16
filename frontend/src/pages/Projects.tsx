@@ -4,12 +4,9 @@ import { FolderPlus, Users, CheckSquare, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import apiClient from '../lib/api';
 
-interface User {
+interface Assignee {
   id: number;
-  username: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
+  name: string;
 }
 
 interface Task {
@@ -21,9 +18,7 @@ interface Task {
   projectId?: number;
   assignedTo?: number;
   dueDate?: string;
-  startTime?: string;
-  endTime?: string;
-  assignee?: User;
+  assignee?: Assignee;
 }
 
 interface Project {
@@ -45,18 +40,12 @@ interface CreateTaskPayload {
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   dueDate?: string;
-  startTime: string;
-  endTime: string;
   projectId: number;
   assignedTo: number;
 }
 
-interface CreateUserPayload {
-  username: string;
-  email: string;
-  password: string;
-  firstName?: string;
-  lastName?: string;
+interface CreateAssigneePayload {
+  name: string;
 }
 
 const PROJECT_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#14B8A6'];
@@ -74,16 +63,10 @@ export default function Projects() {
     description: '',
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
     dueDate: '',
-    startTime: '',
-    endTime: '',
   });
   const [selectedAssignees, setSelectedAssignees] = useState<number[]>([]);
-  const [newUserForm, setNewUserForm] = useState<CreateUserPayload>({
-    username: '',
-    email: '',
-    password: '',
-    firstName: '',
-    lastName: '',
+  const [newAssigneeForm, setNewAssigneeForm] = useState<CreateAssigneePayload>({
+    name: '',
   });
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
@@ -94,11 +77,11 @@ export default function Projects() {
     },
   });
 
-  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
-    queryKey: ['users'],
+  const { data: assignees = [], isLoading: assigneesLoading } = useQuery<Assignee[]>({
+    queryKey: ['assignees'],
     queryFn: async () => {
-      const response = await apiClient.get('/users');
-      return response.data.users;
+      const response = await apiClient.get('/assignees');
+      return response.data.assignees;
     },
   });
 
@@ -138,8 +121,6 @@ export default function Projects() {
         description: '',
         priority: 'medium',
         dueDate: '',
-        startTime: '',
-        endTime: '',
       });
       setSelectedAssignees([]);
       toast.success('Tasks assigned successfully');
@@ -149,24 +130,20 @@ export default function Projects() {
     },
   });
 
-  const createUserMutation = useMutation({
-    mutationFn: async (payload: CreateUserPayload) => {
-      const response = await apiClient.post('/users/admin-create', payload);
-      return response.data.user;
+  const createAssigneeMutation = useMutation({
+    mutationFn: async (payload: CreateAssigneePayload) => {
+      const response = await apiClient.post('/assignees', payload);
+      return response.data.assignee;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      setNewUserForm({
-        username: '',
-        email: '',
-        password: '',
-        firstName: '',
-        lastName: '',
+      queryClient.invalidateQueries({ queryKey: ['assignees'] });
+      setNewAssigneeForm({
+        name: '',
       });
-      toast.success('User created and added to assignee list');
+      toast.success('Assignee added to the list');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to create user');
+      toast.error(error.response?.data?.error || 'Failed to create assignee');
     },
   });
 
@@ -213,67 +190,41 @@ export default function Projects() {
     }
 
     if (selectedAssignees.length === 0) {
-      toast.error('Select at least one user to assign tasks');
+      toast.error('Select at least one assignee');
       return;
     }
 
-    if (!taskForm.startTime || !taskForm.endTime) {
-      toast.error('Start time and end time are required');
-      return;
-    }
-
-    if (new Date(taskForm.endTime) <= new Date(taskForm.startTime)) {
-      toast.error('End time must be later than start time');
-      return;
-    }
-
-    const payload: CreateTaskPayload[] = selectedAssignees.map((userId) => ({
+    const payload: CreateTaskPayload[] = selectedAssignees.map((assigneeId) => ({
       title: taskForm.title.trim(),
       description: taskForm.description.trim(),
       priority: taskForm.priority,
       projectId: Number(taskForm.projectId),
-      assignedTo: userId,
+      assignedTo: assigneeId,
       dueDate: taskForm.dueDate || undefined,
-      startTime: taskForm.startTime,
-      endTime: taskForm.endTime,
     }));
 
     assignTasksMutation.mutate(payload);
   };
 
-  const toggleAssignee = (userId: number) => {
+  const toggleAssignee = (assigneeId: number) => {
     setSelectedAssignees((current) => {
-      if (current.includes(userId)) {
-        return current.filter((id) => id !== userId);
+      if (current.includes(assigneeId)) {
+        return current.filter((id) => id !== assigneeId);
       }
-      return [...current, userId];
+      return [...current, assigneeId];
     });
   };
 
-  const handleCreateUserSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateAssigneeSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!newUserForm.username.trim()) {
-      toast.error('Username is required');
+    if (!newAssigneeForm.name.trim()) {
+      toast.error('Name is required');
       return;
     }
 
-    if (!newUserForm.email.trim()) {
-      toast.error('Email is required');
-      return;
-    }
-
-    if (!newUserForm.password || newUserForm.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
-      return;
-    }
-
-    createUserMutation.mutate({
-      username: newUserForm.username.trim(),
-      email: newUserForm.email.trim().toLowerCase(),
-      password: newUserForm.password,
-      firstName: newUserForm.firstName?.trim() || undefined,
-      lastName: newUserForm.lastName?.trim() || undefined,
+    createAssigneeMutation.mutate({
+      name: newAssigneeForm.name.trim(),
     });
   };
 
@@ -345,7 +296,7 @@ export default function Projects() {
         <form onSubmit={handleTaskAssignmentSubmit} className="card space-y-4">
           <div className="flex items-center gap-2">
             <Users className="text-primary-600" size={20} />
-            <h2 className="text-xl font-bold text-gray-900">Assign Task to Several Users</h2>
+            <h2 className="text-xl font-bold text-gray-900">Assign Task to Multiple People</h2>
           </div>
 
           <div>
@@ -415,56 +366,31 @@ export default function Projects() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-              <input
-                type="datetime-local"
-                className="input"
-                value={taskForm.startTime}
-                onChange={(event) => setTaskForm({ ...taskForm, startTime: event.target.value })}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-              <input
-                type="datetime-local"
-                className="input"
-                value={taskForm.endTime}
-                onChange={(event) => setTaskForm({ ...taskForm, endTime: event.target.value })}
-                required
-              />
-            </div>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
             <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-2 bg-gray-50">
-              {users.map((user) => {
-                const checked = selectedAssignees.includes(user.id);
+              {assignees.map((assignee) => {
+                const checked = selectedAssignees.includes(assignee.id);
                 return (
                   <label
-                    key={user.id}
+                    key={assignee.id}
                     className="flex items-center gap-3 p-2 rounded hover:bg-white cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => toggleAssignee(user.id)}
+                      onChange={() => toggleAssignee(assignee.id)}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{user.username}</p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-sm font-medium text-gray-900">{assignee.name}</p>
                     </div>
                   </label>
                 );
               })}
-              {users.length === 0 && <p className="text-sm text-gray-500 p-2">No users found.</p>}
+              {assignees.length === 0 && <p className="text-sm text-gray-500 p-2">No assignees found. Add one below.</p>}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Selected users: <span className="font-medium">{selectedAssignees.length}</span>
+              Selected: <span className="font-medium">{selectedAssignees.length}</span>
             </p>
           </div>
 
@@ -479,83 +405,36 @@ export default function Projects() {
       </div>
 
       <div className="card mb-8">
-        <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+        <form onSubmit={handleCreateAssigneeSubmit} className="space-y-4">
           <div className="flex items-center gap-2">
             <UserPlus className="text-primary-600" size={20} />
-            <h2 className="text-xl font-bold text-gray-900">Add User for Task Assignment</h2>
+            <h2 className="text-xl font-bold text-gray-900">Add Person for Task Assignment</h2>
           </div>
           <p className="text-sm text-gray-600">
-            Create a user account here so the user appears in the Assign To list.
+            Add people by name so they appear in the Assign To list above.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
               <input
                 className="input"
-                value={newUserForm.username}
+                value={newAssigneeForm.name}
                 onChange={(event) =>
-                  setNewUserForm({ ...newUserForm, username: event.target.value })
+                  setNewAssigneeForm({ ...newAssigneeForm, name: event.target.value })
                 }
-                placeholder="e.g. jordan"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input
-                type="email"
-                className="input"
-                value={newUserForm.email}
-                onChange={(event) => setNewUserForm({ ...newUserForm, email: event.target.value })}
-                placeholder="jordan@example.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input
-                type="password"
-                className="input"
-                value={newUserForm.password}
-                onChange={(event) =>
-                  setNewUserForm({ ...newUserForm, password: event.target.value })
-                }
-                placeholder="At least 6 characters"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input
-                className="input"
-                value={newUserForm.firstName}
-                onChange={(event) =>
-                  setNewUserForm({ ...newUserForm, firstName: event.target.value })
-                }
-                placeholder="Optional"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input
-                className="input"
-                value={newUserForm.lastName}
-                onChange={(event) =>
-                  setNewUserForm({ ...newUserForm, lastName: event.target.value })
-                }
-                placeholder="Optional"
+                placeholder="e.g. Jordan Smith"
+                required
               />
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={createUserMutation.isPending}
+            disabled={createAssigneeMutation.isPending}
             className="btn btn-primary disabled:opacity-50"
           >
-            {createUserMutation.isPending ? 'Creating user...' : 'Add User'}
+            {createAssigneeMutation.isPending ? 'Adding...' : 'Add Person'}
           </button>
         </form>
       </div>
@@ -569,7 +448,7 @@ export default function Projects() {
           <p className="text-sm text-gray-600">{projects.length} projects</p>
         </div>
 
-        {projectsLoading || usersLoading ? (
+        {projectsLoading || assigneesLoading ? (
           <p className="text-gray-500">Loading projects...</p>
         ) : projects.length === 0 ? (
           <p className="text-gray-500">No projects yet. Create your first project above.</p>
@@ -602,8 +481,8 @@ export default function Projects() {
                           <div>
                             <p className="text-sm font-medium text-gray-900">{task.title}</p>
                             <p className="text-xs text-gray-600">
-                              {task.assignee?.username
-                                ? `Assigned to ${task.assignee.username}`
+                              {task.assignee?.name
+                                ? `Assigned to ${task.assignee.name}`
                                 : 'Unassigned'}
                             </p>
                           </div>

@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'task-collab-swarm'
+    monitor: 'task-collab-monitor'
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter for system metrics (CPU, memory, disk)
+  - job_name: 'node-exporter'
+    dns_sd_configs:
+      - names:
+          - 'tasks.node-exporter'
+        type: 'A'
+        port: 9100
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    dns_sd_configs:
+      - names:
+          - 'tasks.cadvisor'
+        type: 'A'
+        port: 8080
+
+  # Backend application metrics (if you add metrics endpoint)
+  - job_name: 'backend'
+    dns_sd_configs:
+      - names:
+          - 'tasks.backend'
+        type: 'A'
+        port: 5000
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s

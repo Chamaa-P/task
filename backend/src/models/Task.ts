@@ -25,8 +25,6 @@ interface TaskAttributes {
   assignedTo?: number;
   createdBy: number;
   dueDate?: Date;
-  startTime?: Date;
-  endTime?: Date;
   estimatedHours?: number;
   tags?: string[];
   createdAt?: Date;
@@ -45,8 +43,6 @@ class Task extends Model<TaskAttributes, TaskCreationAttributes> implements Task
   public assignedTo?: number;
   public createdBy!: number;
   public dueDate?: Date;
-  public startTime?: Date;
-  public endTime?: Date;
   public estimatedHours?: number;
   public tags?: string[];
   public readonly createdAt!: Date;
@@ -90,7 +86,7 @@ Task.init(
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'users',
+        model: 'assignees',
         key: 'id',
       },
     },
@@ -103,14 +99,6 @@ Task.init(
       },
     },
     dueDate: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    startTime: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    endTime: {
       type: DataTypes.DATE,
       allowNull: true,
     },
