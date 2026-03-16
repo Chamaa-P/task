@@ -3,6 +3,7 @@ import { validationResult } from 'express-validator';
 import * as jwt from 'jsonwebtoken';
 import { User } from '../models';
 import { AuthRequest } from '../middleware/auth';
+import { getJwtSecret } from '../utils/secrets';
 
 export const register = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -39,7 +40,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
     // Generate JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username, email: user.email },
-      process.env.JWT_SECRET || 'secret',
+      getJwtSecret(),
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
     );
 
@@ -87,7 +88,7 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     // Generate JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username, email: user.email },
-      process.env.JWT_SECRET || 'secret',
+      getJwtSecret(),
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as jwt.SignOptions
     );
 

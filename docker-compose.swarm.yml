@@ -4,9 +4,12 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: taskuser
-      POSTGRES_PASSWORD: taskpass
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_DB: taskcollab
+    secrets:
+      - postgres_user
+      - postgres_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
@@ -25,9 +28,14 @@ services:
     image: chamaap/task-collab-backend:latest
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://taskuser:taskpass@postgres:5432/taskcollab
-      JWT_SECRET: ${JWT_SECRET}
+      DB_USER_FILE: /run/secrets/postgres_user
+      DB_PASSWORD_FILE: /run/secrets/postgres_password
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
       PORT: 5000
+    secrets:
+      - postgres_user
+      - postgres_password
+      - jwt_secret
     networks:
       - task-network
     deploy:
@@ -56,6 +64,7 @@ services:
       VITE_API_URL: http://backend:5000
     ports:
       - "80:80"
+      - "443:443"
     networks:
       - task-network
     deploy:
@@ -111,8 +120,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
       - GF_USERS_ALLOW_SIGN_UP=false
+    secrets:
+      - grafana_admin_password
     volumes:
       - grafana-data:/var/lib/grafana
     networks:
@@ -194,3 +205,13 @@ networks:
   task-network:
     driver: overlay
     attachable: true
+
+secrets:
+  postgres_user:
+    file: ./secrets/postgres_user.txt
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
