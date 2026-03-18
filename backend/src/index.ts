@@ -13,6 +13,7 @@ import projectRoutes from "./routes/project.routes";
 import assigneeRoutes from "./routes/assignee.routes";
 // import { errorHandler } from './middleware/errorHandler';
 import { initializeWebSocket } from "./websocket/socketHandler";
+import { metricsMiddleware, metricsEndpoint } from "./middleware/metrics";
 
 dotenv.config();
 
@@ -36,6 +37,12 @@ app.use(
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Prometheus metrics middleware
+app.use(metricsMiddleware);
+
+// Metrics endpoint for Prometheus
+app.get("/metrics", metricsEndpoint);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
