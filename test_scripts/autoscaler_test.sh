@@ -7,11 +7,11 @@ DURATION=${3:-60}
 
 # Only works on Docker Swarm services
 if ! docker info | grep -q "Swarm: active"; then
-  echo "⚠️ Docker Swarm not active. Run 'docker swarm init' first."
+  echo "Docker Swarm not active. Run 'docker swarm init' first."
   exit 1
 fi
 
-echo "🚀 Autoscaler smoke test"
+echo "Autoscaler smoke test"
 echo "Base URL: $BASE_URL"
 echo "Service: $SERVICE_NAME"
 

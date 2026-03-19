@@ -49,7 +49,7 @@ const main = async () => {
     const tasks = await axios.get(`${apiUrl}/tasks`, { headers: { Authorization: `Bearer ${token}` } });
     console.log('  /api/tasks (count):', tasks.data.tasks.length);
 
-    console.log('\n✅ Endpoint smoke test completed successfully');
+    console.log('\nEndpoint smoke test completed successfully');
   } catch (err) {
     if (err.response) {
       console.error('Request failed:', err.response.status, err.response.data);

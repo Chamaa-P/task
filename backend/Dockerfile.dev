@@ -1,4 +1,5 @@
 # Development Dockerfile with hot reload
+# For local development only and not production
 FROM node:18-alpine
 
 WORKDIR /app
