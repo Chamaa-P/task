@@ -9,7 +9,7 @@ import {
 
 const router = express.Router();
 
-// All routes require authentication
+// All routes require authentication to ensure only authorized users can manage assignees
 router.use(authenticate);
 
 router.post('/', createAssignee);

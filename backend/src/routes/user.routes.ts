@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { createUserByAdmin, getUsers, getUserById, updateUser } from '../controllers/user.controller';
 
+// User management routes, including admin-only user creation and authenticated user retrieval and updates
+
 const router = Router();
 
 router.post('/admin-create', createUserByAdmin);

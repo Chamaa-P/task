@@ -17,6 +17,15 @@ import { metricsMiddleware, metricsEndpoint } from "./middleware/metrics";
 
 dotenv.config();
 
+// Ensure JWT secret is configured at startup
+import { getJwtSecret } from './utils/secrets';
+try {
+  getJwtSecret();
+} catch (error) {
+  console.error('Startup error:', error);
+  process.exit(1);
+}
+
 const app: Application = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {

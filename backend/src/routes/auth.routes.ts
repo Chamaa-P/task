@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
-// Register new user
+// Register new user with validation to ensure proper input format and security
 router.post(
   '/register',
   [

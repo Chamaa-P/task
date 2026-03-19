@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate } from '../middleware/auth'; 
 import {
   createProject,
   getProjects,
@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-// All routes require authentication
+// All routes require authentication to ensure only authorized users can manage projects
 router.use(authenticate);
 
 router.post('/', createProject);

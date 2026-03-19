@@ -8,7 +8,8 @@ import {
   deleteTask,
 } from '../controllers/task.controller';
 
-const router = Router();
+// Tasks are a core part of the application, and all routes require authentication to ensure only authorized users can manage tasks
+const router = Router(); 
 
 // All routes require authentication
 router.use(authenticate);
