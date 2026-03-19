@@ -217,7 +217,7 @@ cd backend
 docker build -t yourusername/task-collab-backend:latest .
 
 cd ../frontend
-docker build --build-arg VITE_API_URL=http://<MANAGER_PUBLIC_IP>:5000 -t yourusername/task-collab-frontend:latest .
+docker build -t yourusername/task-collab-frontend:latest .
 
 # Push images
 docker push yourusername/task-collab-backend:latest
@@ -233,7 +233,7 @@ doctl registry login
 
 # Build and tag
 docker build -t registry.digitalocean.com/your-registry/task-collab-backend:latest ./backend
-docker build --build-arg VITE_API_URL=http://<MANAGER_PUBLIC_IP>:5000 -t registry.digitalocean.com/your-registry/task-collab-frontend:latest ./frontend
+docker build -t registry.digitalocean.com/your-registry/task-collab-frontend:latest ./frontend
 
 # Push
 docker push registry.digitalocean.com/your-registry/task-collab-backend:latest

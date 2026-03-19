@@ -16,6 +16,15 @@ export default function Register() {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const getErrorMessage = (error: any) => {
+    const data = error.response?.data;
+    if (data?.error) return data.error;
+    if (Array.isArray(data?.errors) && data.errors.length > 0) {
+      return data.errors[0].msg || 'Registration failed';
+    }
+    return 'Registration failed';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -28,7 +37,7 @@ export default function Register() {
       toast.success('Registration successful!');
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Registration failed');
+      toast.error(getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }

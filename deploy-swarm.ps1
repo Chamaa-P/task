@@ -58,10 +58,9 @@ function Build-Images {
     Write-Host "Building backend..." -ForegroundColor Yellow
     docker build -t ${DOCKER_USERNAME}/task-collab-backend:latest ./backend
     
-    # Build frontend with manager IP
+    # Build frontend with relative API paths so nginx can proxy /api to the backend service
     Write-Host "Building frontend..." -ForegroundColor Yellow
-    docker build --build-arg VITE_API_URL="http://${MANAGER_IP}:5000" `
-        -t ${DOCKER_USERNAME}/task-collab-frontend:latest ./frontend
+    docker build -t ${DOCKER_USERNAME}/task-collab-frontend:latest ./frontend
     
     Write-Host "Images built successfully!" -ForegroundColor Green
 }

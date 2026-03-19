@@ -13,6 +13,15 @@ export default function Login() {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const getErrorMessage = (error: any) => {
+    const data = error.response?.data;
+    if (data?.error) return data.error;
+    if (Array.isArray(data?.errors) && data.errors.length > 0) {
+      return data.errors[0].msg || 'Login failed';
+    }
+    return 'Login failed';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -25,7 +34,7 @@ export default function Login() {
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Login failed');
+      toast.error(getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }

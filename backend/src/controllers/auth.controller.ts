@@ -1,9 +1,22 @@
 import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import * as jwt from 'jsonwebtoken';
+import { ValidationError, UniqueConstraintError } from 'sequelize';
 import { User } from '../models';
 import { AuthRequest } from '../middleware/auth';
 import { getJwtSecret } from '../utils/secrets';
+
+const getReadableAuthError = (error: unknown): string => {
+  if (error instanceof UniqueConstraintError || error instanceof ValidationError) {
+    return error.errors[0]?.message || 'Invalid user data';
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unexpected server error';
+};
 
 export const register = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -13,7 +26,11 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    const { username, email, password, firstName, lastName } = req.body;
+    const username = String(req.body.username || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const firstName = req.body.firstName ? String(req.body.firstName).trim() : undefined;
+    const lastName = req.body.lastName ? String(req.body.lastName).trim() : undefined;
 
     // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
@@ -57,7 +74,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Server error during registration' });
+    res.status(500).json({ error: getReadableAuthError(error) });
   }
 };
 
@@ -69,7 +86,8 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
-    const { email, password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
 
     // Find user
     const user = await User.findOne({ where: { email } });
@@ -105,7 +123,7 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error during login' });
+    res.status(500).json({ error: getReadableAuthError(error) });
   }
 };
 

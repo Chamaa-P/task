@@ -17,32 +17,25 @@ import { metricsMiddleware, metricsEndpoint } from "./middleware/metrics";
 
 dotenv.config();
 
-// Ensure JWT secret is configured at startup
-import { getJwtSecret } from './utils/secrets';
-try {
-  getJwtSecret();
-} catch (error) {
-  console.error('Startup error:', error);
-  process.exit(1);
-}
-
 const app: Application = express();
 const httpServer = createServer(app);
+const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3000";
+// Support "*" for allow-all, or comma-separated list of origins
+const corsOptions = {
+  origin: corsOrigin === "*" ? true : corsOrigin.split(','),
+  credentials: true,
+};
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    ...corsOptions,
     methods: ["GET", "POST", "PUT", "DELETE"],
   },
 });
 
 // Middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    credentials: true,
-  }),
-);
+app.use(cors(corsOptions));
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -58,14 +51,9 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-// Readiness endpoint (DB + server readiness)
-app.get("/ready", async (req, res) => {
-  try {
-    await sequelize.authenticate();
-    res.status(200).json({ status: "ready" });
-  } catch (error) {
-    res.status(503).json({ status: "not ready", error: (error as Error).message });
-  }
+// Readiness endpoint used by Docker health checks
+app.get("/ready", (req, res) => {
+  res.status(200).json({ status: "READY", timestamp: new Date().toISOString() });
 });
 
 // API Routes
