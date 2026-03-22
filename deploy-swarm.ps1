@@ -6,14 +6,33 @@ param(
     [string]$Action = "help"
 )
 
-# Configuration - UPDATED WITH YOUR VALUES
+# Configuration - update these values for your environment
 $MANAGER_IP = "138.197.152.191"
 $WORKER1_IP = "159.89.113.54"
 $WORKER2_IP = "159.203.3.95"
 $DOCKER_USERNAME = "chamaap"
-$POSTGRES_PASSWORD = "taskcollab-secure-pass-2026"
-$JWT_SECRET = "jwt-super-secret-key-taskcollab-2026"
 $SSH_KEY = "C:\Users\patri\Documents\UOfT\IntroToCloudComputing\ssh"
+$SECRETS_DIR = Join-Path $PSScriptRoot "secrets"
+$PROMETHEUS_CONFIG = Join-Path $PSScriptRoot "prometheus.yml"
+$REQUIRED_SECRET_FILES = @(
+    "postgres_user.txt",
+    "postgres_password.txt",
+    "jwt_secret.txt",
+    "grafana_admin_password.txt"
+)
+
+function Assert-FileExists {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Path,
+        [Parameter(Mandatory=$true)]
+        [string]$Description
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Missing $Description at $Path"
+    }
+}
 
 function Install-DockerOnNodes {
     Write-Host "Installing Docker on all nodes..." -ForegroundColor Green
@@ -35,15 +54,11 @@ systemctl start docker
 function Initialize-Swarm {
     Write-Host "Initializing Docker Swarm..." -ForegroundColor Green
     
-    # Initialize on manager
     $initOutput = ssh -i $SSH_KEY root@$MANAGER_IP "docker swarm init --advertise-addr $MANAGER_IP"
-    
-    # Extract join token
     $joinCommand = ($initOutput | Select-String "docker swarm join").ToString().Trim()
     
     Write-Host "Swarm initialized. Joining workers..." -ForegroundColor Yellow
     
-    # Join workers
     ssh -i $SSH_KEY root@$WORKER1_IP $joinCommand
     ssh -i $SSH_KEY root@$WORKER2_IP $joinCommand
     
@@ -54,13 +69,14 @@ function Initialize-Swarm {
 function Build-Images {
     Write-Host "Building Docker images..." -ForegroundColor Green
     
-    # Build backend
     Write-Host "Building backend..." -ForegroundColor Yellow
     docker build -t ${DOCKER_USERNAME}/task-collab-backend:latest ./backend
     
-    # Build frontend with relative API paths so nginx can proxy /api to the backend service
     Write-Host "Building frontend..." -ForegroundColor Yellow
     docker build -t ${DOCKER_USERNAME}/task-collab-frontend:latest ./frontend
+
+    Write-Host "Building autoscaler..." -ForegroundColor Yellow
+    docker build -t ${DOCKER_USERNAME}/task-collab-autoscaler:latest ./autoscaler
     
     Write-Host "Images built successfully!" -ForegroundColor Green
 }
@@ -71,29 +87,33 @@ function Push-Images {
     docker login
     docker push ${DOCKER_USERNAME}/task-collab-backend:latest
     docker push ${DOCKER_USERNAME}/task-collab-frontend:latest
+    docker push ${DOCKER_USERNAME}/task-collab-autoscaler:latest
     
     Write-Host "Images pushed!" -ForegroundColor Green
 }
 
 function Deploy-Stack {
     Write-Host "Deploying stack to Swarm..." -ForegroundColor Green
+
+    Assert-FileExists -Path $PROMETHEUS_CONFIG -Description "Prometheus configuration"
+    foreach ($secretFile in $REQUIRED_SECRET_FILES) {
+        Assert-FileExists -Path (Join-Path $SECRETS_DIR $secretFile) -Description "secret file $secretFile"
+    }
     
-    # Update compose file with username
     $composeContent = Get-Content docker-compose.digitalocean.yml -Raw
     $composeContent = $composeContent -replace 'yourusername', $DOCKER_USERNAME
     $composeContent | Set-Content docker-compose.digitalocean.yml.tmp
+
+    ssh -i $SSH_KEY root@$MANAGER_IP "mkdir -p /root/secrets"
     
-    # Copy to manager
     scp -i $SSH_KEY docker-compose.digitalocean.yml.tmp root@${MANAGER_IP}:/root/docker-compose.yml
+    scp -i $SSH_KEY $PROMETHEUS_CONFIG root@${MANAGER_IP}:/root/prometheus.yml
+    foreach ($secretFile in $REQUIRED_SECRET_FILES) {
+        scp -i $SSH_KEY (Join-Path $SECRETS_DIR $secretFile) root@${MANAGER_IP}:/root/secrets/$secretFile
+    }
     
-    # Deploy
-    ssh -i $SSH_KEY root@$MANAGER_IP @"
-export POSTGRES_PASSWORD='$POSTGRES_PASSWORD'
-export JWT_SECRET='$JWT_SECRET'
-docker stack deploy -c /root/docker-compose.yml taskcollab
-"@
+    ssh -i $SSH_KEY root@$MANAGER_IP "docker stack deploy -c /root/docker-compose.yml taskcollab"
     
-    # Cleanup
     Remove-Item docker-compose.digitalocean.yml.tmp
     
     Write-Host "Stack deployed! Waiting for services..." -ForegroundColor Green
@@ -154,11 +174,15 @@ Examples:
   .\deploy-swarm.ps1 -Action status
   .\deploy-swarm.ps1 -Action logs
 
-Before running, update the configuration variables at the top of this script!
+The deploy step expects these local files:
+  - .\prometheus.yml
+  - .\secrets\postgres_user.txt
+  - .\secrets\postgres_password.txt
+  - .\secrets\jwt_secret.txt
+  - .\secrets\grafana_admin_password.txt
 "@ -ForegroundColor Cyan
 }
 
-# Main execution
 switch ($Action.ToLower()) {
     "install-docker" { Install-DockerOnNodes }
     "init-swarm" { Initialize-Swarm }

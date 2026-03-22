@@ -1,17 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  addWeeks,
-  eachDayOfInterval,
-  endOfWeek,
-  format,
-  parseISO,
-  startOfWeek,
-  subWeeks,
-  isSameDay,
-} from 'date-fns';
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, FolderKanban } from 'lucide-react';
 import apiClient from '../lib/api';
+import { getDateKey, parseDueDate } from '../lib/dates';
 
 interface Assignee {
   id: number;
@@ -29,33 +20,73 @@ interface Task {
   title: string;
   description?: string;
   dueDate?: string;
+  status: 'todo' | 'in_progress' | 'completed' | 'archived';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   projectId?: number;
   project?: Project;
   assignee?: Assignee;
 }
 
-interface CalendarSegment {
+interface CalendarItem {
   task: Task;
-  dayIndex: number;
-  top: number;
-  height: number;
-  startTime: string;
-  endTime: string;
+  dueDate: Date;
   projectColor: string;
   projectName: string;
 }
 
-const WEEK_STARTS_ON = 1;
-const START_HOUR = 6;
-const END_HOUR = 22;
-const HOUR_HEIGHT = 64;
-const TASK_START_HOUR = 20; // 8pm
-const TASK_DURATION_HOURS = 1.5; // 1.5 hours (until 9:30pm)
+interface ProjectDueGroup {
+  projectKey: string;
+  projectName: string;
+  projectColor: string;
+  tasks: Task[];
+}
+
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const PRIORITY_ORDER = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+const monthLabelFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  year: 'numeric',
+});
+
+function addDays(date: Date, amount: number): Date {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + amount);
+  return nextDate;
+}
+
+function addMonths(date: Date, amount: number): Date {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function isSameMonth(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth()
+  );
+}
+
+function isToday(date: Date): boolean {
+  return getDateKey(new Date()) === getDateKey(date);
+}
+
+function buildMonthGrid(anchorDate: Date): Date[] {
+  const firstOfMonth = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1);
+  const mondayOffset = (firstOfMonth.getDay() + 6) % 7;
+  const gridStart = addDays(firstOfMonth, -mondayOffset);
+
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+}
 
 export default function Calendar() {
-  const [weekStartDate, setWeekStartDate] = useState<Date>(
-    startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON })
+  const [visibleMonth, setVisibleMonth] = useState<Date>(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
@@ -74,11 +105,6 @@ export default function Calendar() {
     },
   });
 
-  const weekDays = useMemo(() => {
-    const weekEndDate = endOfWeek(weekStartDate, { weekStartsOn: WEEK_STARTS_ON });
-    return eachDayOfInterval({ start: weekStartDate, end: weekEndDate });
-  }, [weekStartDate]);
-
   const projectById = useMemo(() => {
     return projects.reduce<Record<number, Project>>((accumulator, project) => {
       accumulator[project.id] = project;
@@ -86,105 +112,180 @@ export default function Calendar() {
     }, {});
   }, [projects]);
 
-  const hourLabels = useMemo(() => {
-    return Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => {
-      const hour = START_HOUR + index;
-      const date = new Date();
-      date.setHours(hour, 0, 0, 0);
-      return format(date, 'haaa').toLowerCase();
-    });
-  }, []);
-
-  const scheduledSegments = useMemo<CalendarSegment[]>(() => {
+  const calendarItems = useMemo<CalendarItem[]>(() => {
     return tasks
-      .filter((task) => task.dueDate)
-      .flatMap((task) => {
-        const dueDate = parseISO(task.dueDate!);
-
-        if (Number.isNaN(dueDate.getTime())) {
-          return [];
+      .map((task) => {
+        const dueDate = parseDueDate(task.dueDate);
+        if (!dueDate) {
+          return null;
         }
-
-        // Find which day of the week this task belongs to
-        const dayIndex = weekDays.findIndex((day) => isSameDay(day, dueDate));
-        
-        // If the due date is not in this week, skip it
-        if (dayIndex === -1) {
-          return [];
-        }
-
-        // Calculate position: task starts at 8pm (20:00)
-        const minutesFromGridStart = (TASK_START_HOUR - START_HOUR) * 60;
-        const durationMinutes = TASK_DURATION_HOURS * 60;
-
-        const top = (minutesFromGridStart / 60) * HOUR_HEIGHT;
-        const height = (durationMinutes / 60) * HOUR_HEIGHT;
 
         const project = task.projectId ? projectById[task.projectId] : undefined;
-        
-        // Calculate display times
-        const startHour = TASK_START_HOUR;
-        const endHour = TASK_START_HOUR + Math.floor(TASK_DURATION_HOURS);
-        const endMinutes = (TASK_DURATION_HOURS % 1) * 60;
-        const startTime = `${startHour}:00`;
-        const endTime = `${endHour}:${endMinutes.toString().padStart(2, '0')}`;
 
-        return [
-          {
-            task,
-            dayIndex,
-            top,
-            height,
-            startTime,
-            endTime,
-            projectColor: project?.color || task.project?.color || '#3B82F6',
-            projectName: project?.name || task.project?.name || 'General',
-          },
-        ];
+        return {
+          task,
+          dueDate,
+          projectColor: project?.color || task.project?.color || '#3B82F6',
+          projectName: project?.name || task.project?.name || 'General',
+        };
+      })
+      .filter((item): item is CalendarItem => item !== null)
+      .sort((left, right) => {
+        if (left.dueDate.getTime() !== right.dueDate.getTime()) {
+          return left.dueDate.getTime() - right.dueDate.getTime();
+        }
+
+        if (left.projectName !== right.projectName) {
+          return left.projectName.localeCompare(right.projectName);
+        }
+
+        if (PRIORITY_ORDER[left.task.priority] !== PRIORITY_ORDER[right.task.priority]) {
+          return PRIORITY_ORDER[left.task.priority] - PRIORITY_ORDER[right.task.priority];
+        }
+
+        return left.task.title.localeCompare(right.task.title);
       });
-  }, [tasks, weekDays, projectById]);
+  }, [tasks, projectById]);
 
-  const weekTitle = `${format(weekDays[0], 'MMM d')} - ${format(weekDays[6], 'MMM d, yyyy')}`;
-  const totalCalendarHeight = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+  const calendarDays = useMemo(() => buildMonthGrid(visibleMonth), [visibleMonth]);
+
+  const groupsByDate = useMemo(() => {
+    const grouped: Record<string, ProjectDueGroup[]> = {};
+
+    for (const item of calendarItems) {
+      const dateKey = getDateKey(item.dueDate);
+
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+
+      let projectGroup = grouped[dateKey].find(
+        (group) => group.projectKey === `${item.task.projectId || 'general'}-${item.projectName}`
+      );
+
+      if (!projectGroup) {
+        projectGroup = {
+          projectKey: `${item.task.projectId || 'general'}-${item.projectName}`,
+          projectName: item.projectName,
+          projectColor: item.projectColor,
+          tasks: [],
+        };
+        grouped[dateKey].push(projectGroup);
+      }
+
+      projectGroup.tasks.push(item.task);
+    }
+
+    for (const dateKey of Object.keys(grouped)) {
+      grouped[dateKey].sort((left, right) => left.projectName.localeCompare(right.projectName));
+      grouped[dateKey].forEach((group) => {
+        group.tasks.sort((left, right) => {
+          if (PRIORITY_ORDER[left.priority] !== PRIORITY_ORDER[right.priority]) {
+            return PRIORITY_ORDER[left.priority] - PRIORITY_ORDER[right.priority];
+          }
+
+          return left.title.localeCompare(right.title);
+        });
+      });
+    }
+
+    return grouped;
+  }, [calendarItems]);
+
+  const visibleMonthItems = useMemo(() => {
+    return calendarItems.filter((item) => isSameMonth(item.dueDate, visibleMonth));
+  }, [calendarItems, visibleMonth]);
+
+  const visibleMonthProjectCount = useMemo(() => {
+    return new Set(visibleMonthItems.map((item) => item.projectName)).size;
+  }, [visibleMonthItems]);
+
+  const busiestDateLabel = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const item of visibleMonthItems) {
+      const dateKey = getDateKey(item.dueDate);
+      counts.set(dateKey, (counts.get(dateKey) || 0) + 1);
+    }
+
+    let busiestDate: string | null = null;
+    let busiestCount = 0;
+
+    for (const [dateKey, count] of counts.entries()) {
+      if (count > busiestCount) {
+        busiestDate = dateKey;
+        busiestCount = count;
+      }
+    }
+
+    if (!busiestDate) {
+      return 'No due dates this month';
+    }
+
+    const [year, month, day] = busiestDate.split('-').map(Number);
+    const displayDate = new Date(year, month - 1, day);
+
+    return `${displayDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })} (${busiestCount} due)`;
+  }, [visibleMonthItems]);
 
   return (
     <div>
-      <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Weekly Calendar</h1>
-          <p className="text-gray-600 mt-2">View tasks on their due dates (scheduled at 8:00 PM - 9:30 PM)</p>
+          <h1 className="text-3xl font-bold text-gray-900">Due Date Calendar</h1>
+          <p className="mt-2 text-gray-600">
+            View deadlines by day, with every due project grouped clearly on the calendar.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setWeekStartDate((current) => subWeeks(current, 1))}
+            onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
             className="btn btn-secondary flex items-center gap-1"
           >
             <ChevronLeft size={16} />
-            Prev Week
+            Prev Month
           </button>
           <button
             onClick={() =>
-              setWeekStartDate(startOfWeek(new Date(), { weekStartsOn: WEEK_STARTS_ON }))
+              setVisibleMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
             }
             className="btn btn-secondary"
           >
             Today
           </button>
           <button
-            onClick={() => setWeekStartDate((current) => addWeeks(current, 1))}
+            onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
             className="btn btn-secondary flex items-center gap-1"
           >
-            Next Week
+            Next Month
             <ChevronRight size={16} />
           </button>
         </div>
       </div>
 
       <div className="card mb-6">
-        <div className="flex items-center gap-2 text-gray-700 font-medium">
-          <CalendarDays size={18} className="text-primary-600" />
-          <span>{weekTitle}</span>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-2 text-gray-700 font-medium">
+            <CalendarDays size={18} className="text-primary-600" />
+            <span>{monthLabelFormatter.format(visibleMonth)}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-3 text-sm">
+            <div className="rounded-full bg-primary-50 px-3 py-1.5 text-primary-700">
+              {visibleMonthItems.length} due {visibleMonthItems.length === 1 ? 'task' : 'tasks'}
+            </div>
+            <div className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">
+              <FolderKanban size={14} className="mr-1.5 inline" />
+              {visibleMonthProjectCount} {visibleMonthProjectCount === 1 ? 'project' : 'projects'}
+            </div>
+            <div className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">
+              Busiest day: {busiestDateLabel}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -193,68 +294,105 @@ export default function Calendar() {
           <p className="text-gray-500">Loading calendar...</p>
         ) : (
           <div className="min-w-[980px]">
-            <div className="grid grid-cols-[80px_repeat(7,minmax(120px,1fr))] border-b border-gray-200">
-              <div className="p-3 text-xs font-medium text-gray-500">Time</div>
-              {weekDays.map((day) => (
-                <div key={day.toISOString()} className="p-3 border-l border-gray-200">
-                  <p className="text-xs text-gray-500 uppercase">{format(day, 'EEE')}</p>
-                  <p className="text-sm font-semibold text-gray-900">{format(day, 'MMM d')}</p>
+            <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+              {WEEKDAY_LABELS.map((label) => (
+                <div
+                  key={label}
+                  className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500"
+                >
+                  {label}
                 </div>
               ))}
             </div>
 
-            <div
-              className="grid grid-cols-[80px_repeat(7,minmax(120px,1fr))]"
-              style={{ height: `${totalCalendarHeight}px` }}
-            >
-              <div className="relative border-r border-gray-200 bg-gray-50">
-                {hourLabels.map((label, index) => (
+            <div className="grid grid-cols-7">
+              {calendarDays.map((day, index) => {
+                const dayGroups = groupsByDate[getDateKey(day)] || [];
+                const dueTaskCount = dayGroups.reduce((sum, group) => sum + group.tasks.length, 0);
+                const inVisibleMonth = isSameMonth(day, visibleMonth);
+
+                return (
                   <div
-                    key={label}
-                    className="absolute left-0 right-0 -translate-y-1/2 px-2 text-[11px] text-gray-500"
-                    style={{ top: `${index * HOUR_HEIGHT}px` }}
+                    key={day.toISOString()}
+                    className={`min-h-[220px] border-b border-r border-gray-200 p-3 ${
+                      index % 7 === 0 ? 'border-l' : ''
+                    } ${inVisibleMonth ? 'bg-white' : 'bg-gray-50/80'}`}
                   >
-                    {label}
-                  </div>
-                ))}
-              </div>
-
-              {weekDays.map((day, dayIndex) => (
-                <div key={day.toISOString()} className="relative border-l border-gray-200">
-                  {hourLabels.map((_, hourIndex) => (
-                    <div
-                      key={hourIndex}
-                      className="absolute left-0 right-0 border-t border-gray-100"
-                      style={{ top: `${hourIndex * HOUR_HEIGHT}px` }}
-                    />
-                  ))}
-
-                  {scheduledSegments
-                    .filter((segment) => segment.dayIndex === dayIndex)
-                    .map((segment) => (
-                      <div
-                        key={`${segment.task.id}-${segment.dayIndex}`}
-                        className="absolute left-1 right-1 rounded-md p-2 text-white shadow-sm overflow-hidden"
-                        style={{
-                          top: `${segment.top}px`,
-                          height: `${segment.height}px`,
-                          backgroundColor: segment.projectColor,
-                        }}
-                      >
-                        <p className="text-xs font-semibold truncate">{segment.task.title}</p>
-                        <p className="text-[11px] opacity-90 truncate">
-                          {segment.startTime} - {segment.endTime}
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p
+                          className={`text-xs font-semibold uppercase tracking-[0.16em] ${
+                            inVisibleMonth ? 'text-gray-500' : 'text-gray-400'
+                          }`}
+                        >
+                          {day.toLocaleDateString('en-US', { weekday: 'short' })}
                         </p>
-                        <p className="text-[11px] opacity-90 truncate">{segment.projectName}</p>
-                        {segment.task.assignee?.name && (
-                          <p className="text-[11px] opacity-90 truncate">
-                            {segment.task.assignee.name}
-                          </p>
-                        )}
+                        <p
+                          className={`text-lg font-bold ${
+                            isToday(day)
+                              ? 'text-primary-700'
+                              : inVisibleMonth
+                              ? 'text-gray-900'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          {day.getDate()}
+                        </p>
                       </div>
-                    ))}
-                </div>
-              ))}
+
+                      {dueTaskCount > 0 && (
+                        <div className="rounded-full bg-primary-50 px-2.5 py-1 text-right">
+                          <p className="text-xs font-semibold text-primary-700">{dueTaskCount} due</p>
+                          <p className="text-[11px] text-primary-600">
+                            {dayGroups.length} {dayGroups.length === 1 ? 'project' : 'projects'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="max-h-[145px] space-y-2 overflow-y-auto pr-1">
+                      {dayGroups.length === 0 ? (
+                        <p className={`text-xs ${inVisibleMonth ? 'text-gray-400' : 'text-gray-300'}`}>
+                          No due items
+                        </p>
+                      ) : (
+                        dayGroups.map((group) => (
+                          <div
+                            key={group.projectKey}
+                            className="rounded-xl border border-gray-200 bg-white p-2 shadow-sm"
+                          >
+                            <div className="mb-1 flex items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: group.projectColor }}
+                              />
+                              <p className="min-w-0 flex-1 truncate text-xs font-semibold text-gray-900">
+                                {group.projectName}
+                              </p>
+                              <span className="shrink-0 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                                {group.tasks.length}
+                              </span>
+                            </div>
+
+                            {group.tasks.slice(0, 2).map((task) => (
+                              <p key={task.id} className="truncate text-[11px] text-gray-600">
+                                {task.title}
+                                {task.assignee?.name ? ` • ${task.assignee.name}` : ''}
+                              </p>
+                            ))}
+
+                            {group.tasks.length > 2 && (
+                              <p className="text-[11px] font-medium text-primary-700">
+                                +{group.tasks.length - 2} more due
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

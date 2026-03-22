@@ -24,7 +24,7 @@ interface TaskAttributes {
   projectId?: number;
   assignedTo?: number;
   createdBy: number;
-  dueDate?: Date;
+  dueDate?: string | null;
   estimatedHours?: number;
   tags?: string[];
   createdAt?: Date;
@@ -42,7 +42,7 @@ class Task extends Model<TaskAttributes, TaskCreationAttributes> implements Task
   public projectId?: number;
   public assignedTo?: number;
   public createdBy!: number;
-  public dueDate?: Date;
+  public dueDate?: string | null;
   public estimatedHours?: number;
   public tags?: string[];
   public readonly createdAt!: Date;
@@ -99,7 +99,7 @@ Task.init(
       },
     },
     dueDate: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
       allowNull: true,
     },
     estimatedHours: {

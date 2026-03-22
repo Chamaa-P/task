@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckSquare, Filter, Calendar, User, AlertCircle } from 'lucide-react';
 import apiClient from '../lib/api';
+import { formatDueDate, isDueDateOverdue } from '../lib/dates';
 
 interface Assignee {
   id: number;
@@ -151,9 +152,7 @@ export default function Tasks() {
         ) : (
           <div className="space-y-3">
             {filteredTasks.map((task) => {
-              const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-              const now = new Date();
-              const isOverdue = dueDate && dueDate < now && task.status !== 'completed';
+              const isOverdue = isDueDateOverdue(task.dueDate, task.status);
 
               return (
                 <div
@@ -194,11 +193,7 @@ export default function Tasks() {
                           <Calendar size={16} className={isOverdue ? 'text-red-600' : 'text-gray-500'} />
                           {task.dueDate ? (
                             <span className={isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}>
-                              {dueDate?.toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                              })}
+                              {formatDueDate(task.dueDate)}
                               {isOverdue && (
                                 <span className="ml-1 inline-flex items-center">
                                   <AlertCircle size={14} className="inline ml-0.5" />

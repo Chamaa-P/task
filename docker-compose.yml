@@ -37,11 +37,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/ready || exit 1"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/ready', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -60,6 +57,7 @@ services:
       VITE_API_URL: http://localhost:5000
     ports:
       - "3000:80"
+      - "3443:443"
     depends_on:
       - backend
     networks:

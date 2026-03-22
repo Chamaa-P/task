@@ -356,7 +356,7 @@ export default function Projects() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (day only)</label>
               <input
                 type="date"
                 className="input"

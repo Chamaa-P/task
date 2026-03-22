@@ -4,11 +4,13 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: taskuser
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskpass}
+      POSTGRES_USER_FILE: /run/secrets/postgres_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_DB: taskcollab
+    secrets:
+      - postgres_user
+      - postgres_password
     volumes:
-      # Use bind mount to DigitalOcean Volume mounted at /mnt/postgres-data
       - type: bind
         source: /mnt/postgres-data
         target: /var/lib/postgresql/data
@@ -28,10 +30,15 @@ services:
     image: chamaap/task-collab-backend:latest
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://taskuser:${POSTGRES_PASSWORD:-taskpass}@postgres:5432/taskcollab
-      JWT_SECRET: ${JWT_SECRET:-change-this-secret}
+      DB_USER_FILE: /run/secrets/postgres_user
+      DB_PASSWORD_FILE: /run/secrets/postgres_password
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
       CORS_ORIGIN: "*"
       PORT: 5000
+    secrets:
+      - postgres_user
+      - postgres_password
+      - jwt_secret
     networks:
       - task-network
     deploy:
@@ -51,11 +58,14 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    depends_on:
+      - postgres
 
   frontend:
     image: chamaap/task-collab-frontend:latest
     ports:
       - "80:80"
+      - "443:443"
     networks:
       - task-network
     deploy:
@@ -63,12 +73,18 @@ services:
       update_config:
         parallelism: 1
         delay: 10s
+      placement:
+        constraints:
+          - node.role == worker
+        max_replicas_per_node: 1
       restart_policy:
         condition: on-failure
       resources:
         limits:
           cpus: '0.25'
           memory: 256M
+    depends_on:
+      - backend
 
   visualizer:
     image: dockersamples/visualizer:latest
@@ -83,7 +99,122 @@ services:
         constraints:
           - node.role == manager
 
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - task-network
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - task-network
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - task-network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - task-network
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+
+  autoscaler:
+    image: chamaap/task-collab-autoscaler:latest
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+      CHECK_INTERVAL: 30
+      SCALE_UP_THRESHOLD: 70
+      SCALE_DOWN_THRESHOLD: 30
+      COOLDOWN_PERIOD: 60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - task-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
 networks:
   task-network:
     driver: overlay
     attachable: true
+
+secrets:
+  postgres_user:
+    file: ./secrets/postgres_user.txt
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt

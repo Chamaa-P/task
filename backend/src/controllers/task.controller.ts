@@ -3,6 +3,34 @@ import { Task, User, Project, Assignee } from '../models';
 import { AuthRequest } from '../middleware/auth';
 import { TaskStatus, TaskPriority } from '../models/Task';
 
+const normalizeDueDate = (value: unknown): string | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null || value === '') {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim().slice(0, 10);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  const fallback = new Date(value);
+
+  if (Number.isNaN(fallback.getTime())) {
+    return undefined;
+  }
+
+  return fallback.toISOString().slice(0, 10);
+};
+
 export const createTask = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const {
@@ -17,6 +45,13 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
       tags,
     } = req.body;
 
+    const normalizedDueDate = normalizeDueDate(dueDate);
+
+    if (dueDate !== undefined && normalizedDueDate === undefined) {
+      res.status(400).json({ error: 'Invalid due date format' });
+      return;
+    }
+
     const task = await Task.create({
       title,
       description,
@@ -25,7 +60,7 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
       projectId,
       assignedTo,
       createdBy: req.user!.id,
-      dueDate,
+      dueDate: normalizedDueDate,
       estimatedHours,
       tags,
     });
@@ -102,6 +137,17 @@ export const updateTask = async (req: AuthRequest, res: Response): Promise<void>
   try {
     const { id } = req.params;
     const updates = req.body;
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'dueDate')) {
+      const normalizedDueDate = normalizeDueDate(updates.dueDate);
+
+      if (updates.dueDate !== undefined && normalizedDueDate === undefined) {
+        res.status(400).json({ error: 'Invalid due date format' });
+        return;
+      }
+
+      updates.dueDate = normalizedDueDate;
+    }
 
     const task = await Task.findByPk(id);
 
