@@ -2,6 +2,11 @@ import { Response } from 'express';
 import { Task, User, Project, Assignee } from '../models';
 import { AuthRequest } from '../middleware/auth';
 import { TaskStatus, TaskPriority } from '../models/Task';
+import {
+  emitTaskCreated,
+  emitTaskDeleted,
+  emitTaskUpdated,
+} from '../websocket/socketHandler';
 
 const normalizeDueDate = (value: unknown): string | null | undefined => {
   if (value === undefined) {
@@ -72,6 +77,12 @@ export const createTask = async (req: AuthRequest, res: Response): Promise<void>
         { model: Assignee, as: 'assignee', attributes: ['id', 'name'] },
         { model: Project, as: 'project' },
       ],
+    });
+
+    emitTaskCreated({
+      task: createdTask,
+      actorUserId: req.user!.id,
+      projectId: createdTask?.projectId ?? null,
     });
 
     res.status(201).json({ task: createdTask });
@@ -166,6 +177,12 @@ export const updateTask = async (req: AuthRequest, res: Response): Promise<void>
       ],
     });
 
+    emitTaskUpdated({
+      task: updatedTask,
+      actorUserId: req.user!.id,
+      projectId: updatedTask?.projectId ?? null,
+    });
+
     res.status(200).json({ task: updatedTask });
   } catch (error) {
     console.error('Update task error:', error);
@@ -184,7 +201,16 @@ export const deleteTask = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
+    const deletedTaskId = task.id;
+    const deletedProjectId = task.projectId ?? null;
+
     await task.destroy();
+
+    emitTaskDeleted({
+      taskId: deletedTaskId,
+      actorUserId: req.user!.id,
+      projectId: deletedProjectId,
+    });
 
     res.status(200).json({ message: 'Task deleted successfully' });
   } catch (error) {

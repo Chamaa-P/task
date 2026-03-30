@@ -20,8 +20,8 @@ COOLDOWN_PERIOD = int(os.getenv('COOLDOWN_PERIOD', '60'))  # seconds
 # Service scaling configuration
 SERVICES = {
     'taskcollab_backend': {
-        'min_replicas': 3,
-        'max_replicas': 5,
+        'min_replicas': 1,
+        'max_replicas': 1,
         'metrics': ['cpu', 'memory']
     },
     'taskcollab_frontend': {

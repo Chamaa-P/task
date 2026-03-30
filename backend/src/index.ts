@@ -20,9 +20,13 @@ dotenv.config();
 const app: Application = express();
 const httpServer = createServer(app);
 const corsOrigin = process.env.CORS_ORIGIN || "http://localhost:3000";
+const PORT = process.env.PORT || 5000;
+const STARTUP_RETRY_DELAY_MS = Number(process.env.STARTUP_RETRY_DELAY_MS || 5000);
+const MAX_STARTUP_RETRIES = Number(process.env.MAX_STARTUP_RETRIES || 0);
+
 // Support "*" for allow-all, or comma-separated list of origins
 const corsOptions = {
-  origin: corsOrigin === "*" ? true : corsOrigin.split(','),
+  origin: corsOrigin === "*" ? true : corsOrigin.split(","),
   credentials: true,
 };
 
@@ -32,6 +36,39 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST", "PUT", "DELETE"],
   },
 });
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const initializeDatabase = async (): Promise<void> => {
+  let attempt = 0;
+
+  while (MAX_STARTUP_RETRIES === 0 || attempt < MAX_STARTUP_RETRIES) {
+    attempt += 1;
+
+    try {
+      await sequelize.authenticate();
+      console.log("Database connection established successfully.");
+
+      await sequelize.sync({ alter: process.env.NODE_ENV === "development" });
+      console.log("Database models synced.");
+      return;
+    } catch (error) {
+      console.error(
+        `Database initialization attempt ${attempt} failed. Retrying in ${STARTUP_RETRY_DELAY_MS}ms...`,
+        error
+      );
+
+      if (MAX_STARTUP_RETRIES > 0 && attempt >= MAX_STARTUP_RETRIES) {
+        throw error;
+      }
+
+      await sleep(STARTUP_RETRY_DELAY_MS);
+    }
+  }
+};
 
 // Middleware
 app.use(helmet());
@@ -69,27 +106,17 @@ initializeWebSocket(io);
 // Error handling
 // app.use(errorHandler);
 
-// Database connection and server start
-const PORT = process.env.PORT || 5000;
-
 const startServer = async () => {
   try {
-    // Test database connection
-    await sequelize.authenticate();
-    console.log("✅ Database connection established successfully.");
+    await initializeDatabase();
 
-    // Sync database models (in production, use migrations)
-    await sequelize.sync({ alter: process.env.NODE_ENV === "development" });
-    console.log("✅ Database models synced.");
-
-    // Start server
     httpServer.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📡 WebSocket server ready`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+      console.log(`Server running on port ${PORT}`);
+      console.log("WebSocket server ready");
+      console.log(`Environment: ${process.env.NODE_ENV}`);
     });
   } catch (error) {
-    console.error("❌ Unable to start server:", error);
+    console.error("Unable to start server:", error);
     process.exit(1);
   }
 };

@@ -11,9 +11,11 @@ $MANAGER_IP = "138.197.152.191"
 $WORKER1_IP = "159.89.113.54"
 $WORKER2_IP = "159.203.3.95"
 $DOCKER_USERNAME = "chamaap"
+$IMAGE_TAG = "submission-20260321"
 $SSH_KEY = "C:\Users\patri\Documents\UOfT\IntroToCloudComputing\ssh"
 $SECRETS_DIR = Join-Path $PSScriptRoot "secrets"
 $PROMETHEUS_CONFIG = Join-Path $PSScriptRoot "prometheus.yml"
+$GRAFANA_DIR = Join-Path $PSScriptRoot "grafana"
 $REQUIRED_SECRET_FILES = @(
     "postgres_user.txt",
     "postgres_password.txt",
@@ -70,13 +72,13 @@ function Build-Images {
     Write-Host "Building Docker images..." -ForegroundColor Green
     
     Write-Host "Building backend..." -ForegroundColor Yellow
-    docker build -t ${DOCKER_USERNAME}/task-collab-backend:latest ./backend
+    docker build -t ${DOCKER_USERNAME}/task-collab-backend:${IMAGE_TAG} ./backend
     
     Write-Host "Building frontend..." -ForegroundColor Yellow
-    docker build -t ${DOCKER_USERNAME}/task-collab-frontend:latest ./frontend
+    docker build -t ${DOCKER_USERNAME}/task-collab-frontend:${IMAGE_TAG} ./frontend
 
     Write-Host "Building autoscaler..." -ForegroundColor Yellow
-    docker build -t ${DOCKER_USERNAME}/task-collab-autoscaler:latest ./autoscaler
+    docker build -t ${DOCKER_USERNAME}/task-collab-autoscaler:${IMAGE_TAG} ./autoscaler
     
     Write-Host "Images built successfully!" -ForegroundColor Green
 }
@@ -85,9 +87,9 @@ function Push-Images {
     Write-Host "Pushing images to Docker Hub..." -ForegroundColor Green
     
     docker login
-    docker push ${DOCKER_USERNAME}/task-collab-backend:latest
-    docker push ${DOCKER_USERNAME}/task-collab-frontend:latest
-    docker push ${DOCKER_USERNAME}/task-collab-autoscaler:latest
+    docker push ${DOCKER_USERNAME}/task-collab-backend:${IMAGE_TAG}
+    docker push ${DOCKER_USERNAME}/task-collab-frontend:${IMAGE_TAG}
+    docker push ${DOCKER_USERNAME}/task-collab-autoscaler:${IMAGE_TAG}
     
     Write-Host "Images pushed!" -ForegroundColor Green
 }
@@ -96,6 +98,9 @@ function Deploy-Stack {
     Write-Host "Deploying stack to Swarm..." -ForegroundColor Green
 
     Assert-FileExists -Path $PROMETHEUS_CONFIG -Description "Prometheus configuration"
+    Assert-FileExists -Path (Join-Path $GRAFANA_DIR "provisioning\datasources\prometheus.yml") -Description "Grafana datasource provisioning"
+    Assert-FileExists -Path (Join-Path $GRAFANA_DIR "provisioning\dashboards\dashboards.yml") -Description "Grafana dashboard provisioning"
+    Assert-FileExists -Path (Join-Path $GRAFANA_DIR "dashboards\task-collab-overview.json") -Description "Grafana dashboard definition"
     foreach ($secretFile in $REQUIRED_SECRET_FILES) {
         Assert-FileExists -Path (Join-Path $SECRETS_DIR $secretFile) -Description "secret file $secretFile"
     }
@@ -105,14 +110,18 @@ function Deploy-Stack {
     $composeContent | Set-Content docker-compose.digitalocean.yml.tmp
 
     ssh -i $SSH_KEY root@$MANAGER_IP "mkdir -p /root/secrets"
+    ssh -i $SSH_KEY root@$MANAGER_IP "mkdir -p /root/grafana/provisioning/datasources /root/grafana/provisioning/dashboards /root/grafana/dashboards"
     
     scp -i $SSH_KEY docker-compose.digitalocean.yml.tmp root@${MANAGER_IP}:/root/docker-compose.yml
     scp -i $SSH_KEY $PROMETHEUS_CONFIG root@${MANAGER_IP}:/root/prometheus.yml
+    scp -i $SSH_KEY (Join-Path $GRAFANA_DIR "provisioning\datasources\prometheus.yml") root@${MANAGER_IP}:/root/grafana/provisioning/datasources/prometheus.yml
+    scp -i $SSH_KEY (Join-Path $GRAFANA_DIR "provisioning\dashboards\dashboards.yml") root@${MANAGER_IP}:/root/grafana/provisioning/dashboards/dashboards.yml
+    scp -i $SSH_KEY (Join-Path $GRAFANA_DIR "dashboards\task-collab-overview.json") root@${MANAGER_IP}:/root/grafana/dashboards/task-collab-overview.json
     foreach ($secretFile in $REQUIRED_SECRET_FILES) {
         scp -i $SSH_KEY (Join-Path $SECRETS_DIR $secretFile) root@${MANAGER_IP}:/root/secrets/$secretFile
     }
     
-    ssh -i $SSH_KEY root@$MANAGER_IP "docker stack deploy -c /root/docker-compose.yml taskcollab"
+    ssh -i $SSH_KEY root@$MANAGER_IP "docker stack deploy --resolve-image always -c /root/docker-compose.yml taskcollab"
     
     Remove-Item docker-compose.digitalocean.yml.tmp
     
@@ -176,6 +185,9 @@ Examples:
 
 The deploy step expects these local files:
   - .\prometheus.yml
+  - .\grafana\provisioning\datasources\prometheus.yml
+  - .\grafana\provisioning\dashboards\dashboards.yml
+  - .\grafana\dashboards\task-collab-overview.json
   - .\secrets\postgres_user.txt
   - .\secrets\postgres_password.txt
   - .\secrets\jwt_secret.txt
