@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { Project, User, Task } from '../models';
 import { AuthRequest } from '../middleware/auth';
+import { emitProjectCreated, emitProjectDeleted, emitProjectUpdated } from '../websocket/socketHandler';
 
 export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -15,6 +16,11 @@ export const createProject = async (req: AuthRequest, res: Response): Promise<vo
 
     const createdProject = await Project.findByPk(project.id, {
       include: [{ model: User, as: 'owner', attributes: ['id', 'username', 'email'] }],
+    });
+
+    emitProjectCreated({
+      projectId: project.id,
+      actorUserId: req.user!.id,
     });
 
     res.status(201).json({ project: createdProject });
@@ -95,6 +101,11 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
       include: [{ model: User, as: 'owner', attributes: ['id', 'username', 'email'] }],
     });
 
+    emitProjectUpdated({
+      projectId: updatedProject?.id ?? null,
+      actorUserId: req.user!.id,
+    });
+
     res.status(200).json({ project: updatedProject });
   } catch (error) {
     console.error('Update project error:', error);
@@ -120,6 +131,11 @@ export const deleteProject = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     await project.destroy();
+
+    emitProjectDeleted({
+      projectId: project.id,
+      actorUserId: req.user!.id,
+    });
 
     res.status(200).json({ message: 'Project deleted successfully' });
   } catch (error) {

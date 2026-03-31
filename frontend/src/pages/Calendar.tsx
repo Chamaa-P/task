@@ -377,7 +377,7 @@ export default function Calendar() {
                             {group.tasks.slice(0, 2).map((task) => (
                               <p key={task.id} className="truncate text-[11px] text-gray-600">
                                 {task.title}
-                                {task.assignee?.name ? ` • ${task.assignee.name}` : ''}
+                                {task.assignee?.name ? ` â€¢ ${task.assignee.name}` : ''}
                               </p>
                             ))}
 

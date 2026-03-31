@@ -13,6 +13,11 @@ interface TaskSocketPayload {
   actorUserId?: number;
 }
 
+interface ProjectSocketPayload {
+  projectId?: number | string | null;
+  actorUserId?: number;
+}
+
 const connectedUsers: Map<string, ConnectedUser> = new Map();
 let ioInstance: Server | null = null;
 
@@ -126,4 +131,16 @@ export const emitTaskUpdated = (payload: TaskSocketPayload): void => {
 
 export const emitTaskDeleted = (payload: TaskSocketPayload): void => {
   emitEvent('task:deleted', payload);
+};
+
+export const emitProjectCreated = (payload: ProjectSocketPayload): void => {
+  emitEvent('project:created', payload);
+};
+
+export const emitProjectUpdated = (payload: ProjectSocketPayload): void => {
+  emitEvent('project:updated', payload);
+};
+
+export const emitProjectDeleted = (payload: ProjectSocketPayload): void => {
+  emitEvent('project:deleted', payload);
 };
