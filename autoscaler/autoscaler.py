@@ -16,17 +16,35 @@ CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '30'))  # seconds
 SCALE_UP_THRESHOLD = float(os.getenv('SCALE_UP_THRESHOLD', '70'))  # CPU/Memory %
 SCALE_DOWN_THRESHOLD = float(os.getenv('SCALE_DOWN_THRESHOLD', '30'))  # CPU/Memory %
 COOLDOWN_PERIOD = int(os.getenv('COOLDOWN_PERIOD', '60'))  # seconds
+BACKEND_MIN_REPLICAS = int(os.getenv('BACKEND_MIN_REPLICAS', '1'))
+BACKEND_MAX_REPLICAS = int(os.getenv('BACKEND_MAX_REPLICAS', '3'))
+FRONTEND_MIN_REPLICAS = int(os.getenv('FRONTEND_MIN_REPLICAS', '2'))
+FRONTEND_MAX_REPLICAS = int(os.getenv('FRONTEND_MAX_REPLICAS', '3'))
+
+
+def get_replica_bounds(service_name, minimum, maximum):
+    """Return safe replica bounds, correcting invalid configs."""
+    if minimum < 1:
+        print(f"[startup] Warning: {service_name} minimum replicas must be >= 1. Using 1.", flush=True)
+        minimum = 1
+    if maximum < minimum:
+        print(f"[startup] Warning: {service_name} maximum replicas cannot be below minimum. Using {minimum}.", flush=True)
+        maximum = minimum
+    return minimum, maximum
 
 # Service scaling configuration
+backend_min, backend_max = get_replica_bounds('backend', BACKEND_MIN_REPLICAS, BACKEND_MAX_REPLICAS)
+frontend_min, frontend_max = get_replica_bounds('frontend', FRONTEND_MIN_REPLICAS, FRONTEND_MAX_REPLICAS)
+
 SERVICES = {
     'taskcollab_backend': {
-        'min_replicas': 1,
-        'max_replicas': 1,
+        'min_replicas': backend_min,
+        'max_replicas': backend_max,
         'metrics': ['cpu', 'memory']
     },
     'taskcollab_frontend': {
-        'min_replicas': 2,
-        'max_replicas': 3,
+        'min_replicas': frontend_min,
+        'max_replicas': frontend_max,
         'metrics': ['cpu', 'memory']
     }
 }
@@ -139,6 +157,7 @@ def main():
     log("🚀 Starting Docker Swarm Auto-scaler")
     log(f"Configuration: Scale UP > {SCALE_UP_THRESHOLD}%, Scale DOWN < {SCALE_DOWN_THRESHOLD}%")
     log(f"Check interval: {CHECK_INTERVAL}s, Cooldown: {COOLDOWN_PERIOD}s")
+    log(f"Replica bounds: backend {backend_min}-{backend_max}, frontend {frontend_min}-{frontend_max}")
     
     # Connect to Docker
     try:
