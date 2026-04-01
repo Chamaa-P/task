@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckSquare, Filter, Calendar, User, AlertCircle } from 'lucide-react';
+import { CheckSquare, Filter, Calendar, User, AlertCircle, Trash2 } from 'lucide-react';
 import apiClient from '../lib/api';
 import { formatDueDate, isDueDateOverdue } from '../lib/dates';
 
@@ -65,8 +65,23 @@ export default function Tasks() {
     },
   });
 
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: number) => {
+      await apiClient.delete(`/tasks/${taskId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
   const handleStatusChange = (taskId: number, newStatus: string) => {
     updateTaskStatusMutation.mutate({ taskId, status: newStatus });
+  };
+
+  const handleDeleteTask = (taskId: number) => {
+    const confirmed = window.confirm('Delete this task? This action cannot be undone.');
+    if (!confirmed) return;
+    deleteTaskMutation.mutate(taskId);
   };
 
   const filteredTasks = tasks.filter((task) => {
@@ -212,17 +227,29 @@ export default function Tasks() {
                         </span>
 
                         {/* Status Change Dropdown */}
-                        <select
-                          value={task.status}
-                          onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                          className="px-2.5 py-1 text-xs font-medium border rounded bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                          disabled={updateTaskStatusMutation.isPending}
-                        >
-                          <option value="todo">TO DO</option>
-                          <option value="in_progress">IN PROGRESS</option>
-                          <option value="completed">COMPLETED</option>
-                          <option value="archived">ARCHIVED</option>
-                        </select>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            value={task.status}
+                            onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                            className="px-2.5 py-1 text-xs font-medium border rounded bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            disabled={updateTaskStatusMutation.isPending || deleteTaskMutation.isPending}
+                          >
+                            <option value="todo">TO DO</option>
+                            <option value="in_progress">IN PROGRESS</option>
+                            <option value="completed">COMPLETED</option>
+                            <option value="archived">ARCHIVED</option>
+                          </select>
+
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50"
+                            onClick={() => handleDeleteTask(task.id)}
+                            disabled={deleteTaskMutation.isPending || updateTaskStatusMutation.isPending}
+                          >
+                            <Trash2 size={14} />
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
 

@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderPlus, Users, CheckSquare, UserPlus } from 'lucide-react';
+import { FolderPlus, Users, CheckSquare, UserPlus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import apiClient from '../lib/api';
 
@@ -146,6 +146,26 @@ export default function Projects() {
       toast.error(error.response?.data?.error || 'Failed to create assignee');
     },
   });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: number) => {
+      await apiClient.delete(`/projects/${projectId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Project deleted');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to delete project');
+    },
+  });
+
+  const handleDeleteProject = (projectId: number) => {
+    const confirmed = window.confirm('Delete this project? This will remove the project and its linked tasks.');
+    if (!confirmed) return;
+    deleteProjectMutation.mutate(projectId);
+  };
 
   const tasksByProject = useMemo(() => {
     return tasks.reduce<Record<number, Task[]>>((accumulator, task) => {
@@ -459,13 +479,26 @@ export default function Projects() {
 
               return (
                 <div key={project.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: project.color || '#3B82F6' }}
-                    />
-                    <h3 className="font-semibold text-gray-900">{project.name}</h3>
-                    <span className="text-xs text-gray-500">{projectTasks.length} tasks</span>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: project.color || '#3B82F6' }}
+                      />
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{project.name}</h3>
+                        <span className="text-xs text-gray-500">{projectTasks.length} tasks</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50"
+                      onClick={() => handleDeleteProject(project.id)}
+                      disabled={deleteProjectMutation.isPending}
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
                   </div>
                   {project.description && (
                     <p className="text-sm text-gray-600 mb-3">{project.description}</p>
