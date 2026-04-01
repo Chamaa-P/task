@@ -44,35 +44,34 @@ The main objectives of the project were to:
 
 The implemented features satisfy the project core feature requirements for containerization, persistence, orchestration, monitoring, and advanced functionality.
 
-1. Authentication and protected access
-   - Users can register and log in.
-   - JWT-based authentication protects API routes and frontend pages.
-   - Production secrets are provided through Docker Swarm secrets instead of hard-coded credentials.
-2. Project management
+1. Project management
    - Users can create projects with names, descriptions, and color tags.
    - Each project groups related tasks and gives teams a simple workspace structure.
-3. Task assignment and lifecycle tracking
+2. Task assignment and lifecycle tracking
    - Tasks support title, description, priority, status, assignee, and due date.
    - Status updates include `todo`, `in_progress`, `completed`, and `archived`.
    - The Projects page can assign the same task to multiple users in one action.
-4. Day-based calendar view
+3. Day-based calendar view
    - Due dates are displayed on a calendar UI, easy to time manage.
    - The calendar groups tasks by date and makes overlapping deadlines from multiple projects easy to see; intuitive for users.
-5. Persistent state
+4. Persistent state
    - PostgreSQL stores all durable application data.
    - Local development uses Docker volumes, while production uses DigitalOcean Block Storage mounted at `/mnt/postgres-data`.
-6. Monintoring & Observability
+5. Monintoring & Observability
    - Prometheus and Grafana expose service and infrastructure metrics.
 
 ## Advanced Features
 
-1. Real-time synchronization
+1. Authentication and protected access
+   - Users can register and log in.
+   - JWT-based authentication protects API routes and frontend pages.
+   - Production secrets are provided through Docker Swarm secrets instead of hard-coded credentials.
+2. Real-time synchronization
    - Socket.IO broadcasts task changes so multiple clients see updates without refreshing.
-
-2. Autoscaling
+3. Autoscaling
    - cAdvisor and node-exporter provide container and host visibility.
    - A custom autoscaler monitors load and can adjust Swarm service replicas.
-3. Security Enhancements
+4. Security Enhancements
    - Password hashing, JWT authentication, HTTP security headers, Docker secrets, and HTTPS support are included.
 
 ## User Guide
