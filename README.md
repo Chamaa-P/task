@@ -6,7 +6,7 @@ TaskCollab is a cloud-native task collaboration platform for small teams. The sy
 
 | Team Member     | Student Number | Email                            |
 | --------------- | -------------- | -------------------------------- |
-| Arooj Ilyas     | 1012872900     | arooj-ilyas@hotmail.com          |
+| Arooj Ilyas     | 1012872900     | arooj.ilyas@mail.utoronto.ca     |
 | Adam Pietrewicz | 1004401818     | adam.pietrewicz@mail.utoronto.ca |
 | Patrick Chamaa  | 1012574233     | p.chamaa@mail.utoronto.ca        |
 
