@@ -1,6 +1,6 @@
 # TaskCollab Final Report
 
-TaskCollab is a cloud-native task collaboration platform for small teams. The system supports authenticated project and task management, day-based due date tracking, real-time updates, persistent PostgreSQL storage, and a monitored Docker Swarm deployment on DigitalOcean.
+TaskCollab is a cloud-native task collaboration platform for small teams. It supports authenticated project and task management, day-based due dates, real-time updates, persistent PostgreSQL storage, and a monitored Docker Swarm deployment on DigitalOcean.
 
 ## Team Information
 
@@ -12,102 +12,110 @@ TaskCollab is a cloud-native task collaboration platform for small teams. The sy
 
 ## Motivation
 
-Our team chose this project because lightweight coordination is a real problem for student groups and small teams. We wanted to build something that is easy to demonstrate from a user perspective, but also strong from a cloud-computing perspective: persistent state, multi-container development, secure deployment, orchestration, monitoring, and real-time collaboration. TaskCollab addresses the need for a focused workspace where teams can create projects, assign work, track progress, and stay aligned without the overhead of a large enterprise project-management tool.
+Our team chose this project because lightweight coordination is a real problem for student groups and small teams. We wanted something with a clear user-facing workflow, but also a strong cloud-computing story: persistent state, multi-container development, orchestration, monitoring, and secure deployment. TaskCollab addresses the need for a focused workspace where teams can create projects, assign work, track progress, and stay aligned without the overhead of a large enterprise platform.
 
 ## Objectives
 
-The main objectives of the project were to:
-
 1. Build a stateful web application for collaborative task management.
-2. Use PostgreSQL and persistent storage so application state survives restarts and redeployments.
-3. Containerize the full application for local development and deployment.
-4. Deploy the application on an approved cloud provider using a real orchestration platform.
-5. Add advanced features that improve realism and usability, especially real-time synchronization, monitoring, autoscaling, and security.
-6. Produce a deployment and development workflow that is reproducible.
+2. Use PostgreSQL and persistent storage so application data survives restarts and redeployments.
+3. Containerize the full stack for reproducible local development.
+4. Deploy the application to an approved provider using Docker Swarm.
+5. Add advanced features that improve realism and usability, especially real-time synchronization, monitoring, autoscaling, security, and CI/CD.
+6. Document the system clearly enough that another developer can reproduce the setup.
 
 ## Technical Stack
 
-| Area                     | Technologies                                                         | Notes                                                                          |
-| ------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Frontend                 | React, Vite, TypeScript, React Router, Socket.IO client              | Browser UI for authentication, dashboards, projects, tasks, and calendar views |
-| Backend                  | Node.js, Express, TypeScript, Sequelize, Socket.IO, JWT, prom-client | REST API, authentication, real-time events, and metrics                        |
-| Database                 | PostgreSQL 15                                                        | Stores users, projects, tasks, and assignees                                   |
-| Local container workflow | Docker, Docker Compose                                               | Used for local multi-container development and verification                    |
-| Orchestration approach   | Docker Swarm                                                         | Chosen orchestration platform for the course-compliant deployment              |
-| Cloud provider           | DigitalOcean Droplets + Block Storage                                | Production cluster with persistent storage mounted at `/mnt/postgres-data`     |
-| Web serving and TLS      | Nginx                                                                | Serves the frontend and proxies API/WebSocket traffic                          |
-| Monitoring               | Prometheus, Grafana, cAdvisor, node-exporter                         | Collects application, container, and node metrics                              |
-| Scaling                  | Custom Python autoscaler                                             | Adjusts frontend/backend Swarm replicas using Prometheus metrics               |
-| Deployment support       | Docker Hub images, `deploy-swarm.ps1`                                | Helps build, push, and deploy the Swarm stack                                  |
+| Area                   | Technologies                                                         | Notes                                                                          |
+| ---------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Frontend               | React, Vite, TypeScript, React Router, Socket.IO client              | Browser UI for authentication, dashboards, projects, tasks, and calendar views |
+| Backend                | Node.js, Express, TypeScript, Sequelize, Socket.IO, JWT, prom-client | REST API, authentication, real-time events, and metrics                        |
+| Database               | PostgreSQL 15                                                        | Stores users, projects, tasks, and assignees                                   |
+| Local development      | Docker, Docker Compose                                               | Reproducible multi-container development workflow                              |
+| Orchestration          | Docker Swarm                                                         | Production clustering, replication, and service management                     |
+| Cloud provider         | DigitalOcean Droplets and Block Storage                              | Production deployment with persistent storage mounted at `/mnt/postgres-data`  |
+| Web serving and TLS    | Nginx                                                                | Serves the frontend and proxies API and WebSocket traffic                      |
+| Monitoring             | Prometheus, Grafana, cAdvisor, node-exporter                         | Application, container, and node-level monitoring                              |
+| Autoscaling            | Python, Docker SDK, Prometheus queries                               | Custom autoscaler adjusts Swarm replicas based on load                         |
+| Continuous integration | GitHub Actions                                                       | Automated backend/frontend build checks and optional image publishing          |
 
-## Core Features
+## Features
 
-The implemented features satisfy the project core feature requirements for containerization, persistence, orchestration, monitoring, and advanced functionality.
+Primary programming languages used in this project are TypeScript (frontend and backend) and Python (autoscaler).
+
+### Core Requirement Coverage
+
+1. Docker containerization and local multi-container development
+   - `backend/`, `frontend/`, and `autoscaler/` each include Docker support.
+   - `docker-compose.dev.yml` starts PostgreSQL, the backend, and the frontend for local development.
+2. PostgreSQL state management and persistence
+   - Application state is stored in PostgreSQL.
+   - Local development uses Docker volumes.
+   - Production uses a DigitalOcean volume mounted at `/mnt/postgres-data`.
+3. Approved cloud deployment and orchestration
+   - The final deployment target is DigitalOcean.
+   - Docker Swarm provides clustering, service replication, and load balancing.
+4. Monitoring and observability
+   - The backend exposes Prometheus metrics at `/metrics`.
+   - Prometheus, Grafana, cAdvisor, and node-exporter provide service and infrastructure visibility.
+
+### Main Application Features
 
 1. Project management
    - Users can create projects with names, descriptions, and color tags.
-   - Each project groups related tasks and gives teams a simple workspace structure.
 2. Task assignment and lifecycle tracking
    - Tasks support title, description, priority, status, assignee, and due date.
-   - Status updates include `todo`, `in_progress`, `completed`, and `archived`.
-   - The Projects page can assign the same task to multiple users in one action.
+   - Status values include `todo`, `in_progress`, `completed`, and `archived`.
+   - Multiple assignees can be attached to the same task.
 3. Day-based calendar view
-   - Due dates are displayed on a calendar UI, easy to time manage.
-   - The calendar groups tasks by date and makes overlapping deadlines from multiple projects easy to see; intuitive for users.
+   - Due dates are treated as calendar days instead of timestamps.
+   - The calendar groups tasks by date so overlapping deadlines remain easy to review.
 4. Persistent state
-   - PostgreSQL stores all durable application data.
-   - Local development uses Docker volumes, while production uses DigitalOcean Block Storage mounted at `/mnt/postgres-data`.
-5. Monintoring & Observability
-   - Prometheus and Grafana expose service and infrastructure metrics.
+   - Data survives container restarts locally and redeployments in production.
 
-## Advanced Features
+### Advanced Features
 
 1. Authentication and protected access
    - Users can register and log in.
-   - JWT-based authentication protects API routes and frontend pages.
-   - Production secrets are provided through Docker Swarm secrets instead of hard-coded credentials.
+   - JWT-based authentication protects API routes and frontend routes.
 2. Real-time synchronization
-   - Socket.IO broadcasts task changes so multiple clients see updates without refreshing.
+   - Socket.IO broadcasts task changes so multiple clients stay in sync without refreshing.
 3. Autoscaling
-   - cAdvisor and node-exporter provide container and host visibility.
-   - A custom autoscaler monitors load and can adjust Swarm service replicas.
-4. Security Enhancements
+   - A custom Python autoscaler monitors Prometheus metrics and adjusts Swarm replica counts within configured bounds.
+4. Security enhancements
    - Password hashing, JWT authentication, HTTP security headers, Docker secrets, and HTTPS support are included.
+5. CI/CD support
+   - GitHub Actions builds the backend and frontend automatically and can publish Docker images when Docker Hub secrets are configured.
 
 ## User Guide
 
 1. Register and log in
    - Open the live URL.
    - Create an account on the Register page, then sign in.
-2. Use the Dashboard
-   - The Dashboard summarizes total tasks, projects, in-progress work, completed work, recent tasks, and project counts.
+2. Use the dashboard
+   - The Dashboard summarizes projects, recent tasks, and task status counts.
 3. Create a project
-   - Go to the Projects page.
-   - Create a project by entering a name, description, and color.
+   - Open the Projects page and add a project name, description, and color.
 4. Add assignees and create tasks
-   - On the Projects page, add assignees.
-   - Choose a project, enter a task title/description, set priority and day-based due date, then assign that task to one or more assignees.
+   - Add assignees to a project.
+   - Create tasks with a title, description, priority, due date, and one or more assignees.
 5. Manage task progress
-   - Open the Tasks page to view all tasks.
-   - Filter by status or priority and update each task's status from the inline dropdown.
+   - Use the Tasks page to filter tasks and update status inline.
    - Overdue tasks are highlighted automatically.
 6. Review deadlines in the calendar
-   - Open the Calendar page to view all due dates in a month-style layout.
-   - Tasks due on the same day are grouped so overlapping project deadlines remain visible.
-7. Observe real-time behavior
-   - If two users are connected at the same time, task changes made by one user should appear for the other without a manual refresh.
+   - Open the Calendar page to see all due dates in a month layout.
+7. Observe real-time updates
+   - If two users are connected at the same time, task changes made by one user appear for the other without a manual refresh.
 
-## Development
+## Development Guide
 
 ### Prerequisites
 
-- Node.js 20 or newer
-- npm
-- Docker Desktop or Docker Engine
+- Docker Desktop or Docker Engine with Docker Compose
+- Node.js 20 or newer and `npm` if running the frontend/backend outside containers
 
-### Environment configuration
+### Environment Configuration
 
-Frontend and backend example environment files are included:
+Example environment files are included:
 
 - `backend/.env.example`
 - `frontend/.env.example`
@@ -127,11 +135,9 @@ CORS_ORIGIN=http://localhost:3000
 VITE_API_URL=http://localhost:5000
 ```
 
-If you want to use the repository's environment check script, create a root `.env` that defines `DATABASE_URL`, `JWT_SECRET`, `VITE_API_URL`, and `PORT`.
+### Local Execution With Docker Compose
 
-### Local development with Docker Compose
-
-Run the development stack with hot reload from the repository root:
+From the repository root:
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
@@ -139,13 +145,31 @@ docker compose -f docker-compose.dev.yml up --build
 
 This starts:
 
-- PostgreSQL on port `5432`
-- Backend API on port `5000`
-- Frontend dev server on port `3000`
+- PostgreSQL on `localhost:5432`
+- Backend API on `localhost:5000`
+- Frontend development server on `localhost:3000`
 
-### Source-based local development
+Stop the stack with:
 
-If you want to run the app outside the development containers:
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+If you want to remove the local database volume as well:
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+```
+
+### Source-Based Local Execution
+
+If you want to run the app outside the development containers, start PostgreSQL first:
+
+```bash
+docker run --name taskcollab-postgres -e POSTGRES_USER=taskuser -e POSTGRES_PASSWORD=taskpass -e POSTGRES_DB=taskcollab -p 5432:5432 -v taskcollab-postgres:/var/lib/postgresql/data -d postgres:15-alpine
+```
+
+Then run the backend:
 
 ```bash
 cd backend
@@ -154,7 +178,7 @@ npm run build
 npm run dev
 ```
 
-In a second terminal:
+In a second terminal, run the frontend:
 
 ```bash
 cd frontend
@@ -163,73 +187,122 @@ npm run build
 npm run dev
 ```
 
-You will also need a PostgreSQL instance running locally or via Docker with the connection string expected by `backend/.env`.
-
-### Database and storage
-
-- Local development uses Docker-managed volumes such as `postgres-dev-data` or `postgres-data`.
-- Production PostgreSQL storage is mounted from the provider volume at `/mnt/postgres-data`.
-- The DigitalOcean production stack constrains PostgreSQL to the manager node so the volume stays attached to the correct host.
-
-### Local testing and verification
+### Local Testing and Verification
 
 Recommended checks after setup:
 
-1. Confirm the frontend builds with `cd frontend && npm run build`.
-2. Confirm the backend builds with `cd backend && npm run build`.
-3. Visit `http://localhost:3000` and exercise register, project creation, task assignment, task status updates, and the calendar view.
-4. Confirm the backend health endpoint at `http://localhost:5000/health`.
-5. Confirm the backend metrics endpoint at `http://localhost:5000/metrics`.
-6. Use the supplemental scripts under `test_scripts/` if you want additional environment, endpoint, database, WebSocket, or autoscaler checks.
+1. Visit `http://localhost:3000` and exercise register, login, project creation, task creation, task status updates, and calendar rendering.
+2. Confirm the backend health endpoint at `http://localhost:5000/health`.
+3. Confirm the backend metrics endpoint at `http://localhost:5000/metrics`.
+4. Build the backend with `cd backend && npm run build`.
+5. Build the frontend with `cd frontend && npm run build`.
+6. Use the supplemental scripts under `test_scripts/` if additional endpoint, database, WebSocket, or autoscaler checks are needed.
+
+### Manual DigitalOcean Swarm Deployment
+
+The repository no longer depends on a PowerShell deployment helper. The deployment can be reproduced directly with the checked-in files.
+
+1. Build and push the images that will be referenced by `docker-compose.digitalocean.yml`:
+
+```bash
+docker build -t <dockerhub-user>/task-collab-backend:<tag> ./backend
+docker build -t <dockerhub-user>/task-collab-frontend:<tag> ./frontend
+docker build -t <dockerhub-user>/task-collab-autoscaler:<tag> ./autoscaler
+docker push <dockerhub-user>/task-collab-backend:<tag>
+docker push <dockerhub-user>/task-collab-frontend:<tag>
+docker push <dockerhub-user>/task-collab-autoscaler:<tag>
+```
+
+2. If you change the image names or tags, update them in `docker-compose.digitalocean.yml`.
+
+3. On the DigitalOcean manager node, prepare storage and clone the repository:
+
+```bash
+sudo mkdir -p /mnt/postgres-data
+sudo chown 999:999 /mnt/postgres-data
+git clone <repo-url>
+cd task
+```
+
+4. Create the production secret files expected by `docker-compose.digitalocean.yml`:
+
+```bash
+mkdir -p secrets
+printf '%s' '<postgres-user>' > secrets/postgres_user.txt
+printf '%s' '<postgres-password>' > secrets/postgres_password.txt
+printf '%s' '<jwt-secret>' > secrets/jwt_secret.txt
+printf '%s' '<grafana-admin-password>' > secrets/grafana_admin_password.txt
+```
+
+5. Initialize Swarm on the manager and join the workers:
+
+```bash
+docker swarm init --advertise-addr <manager-ip>
+docker swarm join-token worker
+```
+
+Run the printed `docker swarm join ...` command on each worker node.
+
+6. Deploy the stack from the manager:
+
+```bash
+docker stack deploy -c docker-compose.digitalocean.yml taskcollab
+docker service ls
+docker stack services taskcollab
+docker node ls
+```
+
+If production redeployment requires secrets that are not included in the repository, send them to the TA separately as required by the handout.
 
 ## Deployment Information
 
-The live application URL is:
+Live application URL:
 
 - [https://138.197.152.191](https://138.197.152.191)
 
-The production deployment uses DigitalOcean Docker Swarm with one manager node, two worker nodes, replicated frontend services, a backend API service, a PostgreSQL service pinned to the manager, and a provider-backed storage mount at `/mnt/postgres-data`.
+Production deployment summary:
 
-Important deployment files:
+- One DigitalOcean manager node and two worker nodes
+- Docker Swarm overlay network for service communication
+- Replicated frontend service behind Swarm load balancing
+- Backend API service with Prometheus metrics
+- PostgreSQL pinned to the manager node with persistent storage at `/mnt/postgres-data`
+- Prometheus, Grafana, cAdvisor, and node-exporter for monitoring
+- Python autoscaler service connected to Prometheus and the Docker socket
 
-- `docker-compose.digitalocean.yml`
-- `deploy-swarm.ps1`
-- `DIGITALOCEAN_SWARM_DEPLOYMENT.md`
-- `DIGITALOCEAN_VOLUME_MIGRATION.md`
+## AI Assistance & Verification
 
-## AI Assistance and Verification Summary
-
-AI tools were used, but only as support. We reviewed the output and verified changes before implementing and merging to main.
+AI tools were used as implementation support, not as a substitute for design or verification. We reviewed the suggestions, rejected parts that did not fit the project, and validated the final system ourselves.
 
 1. Where AI meaningfully contributed
-   - Architecture and repository-compliance review against the course handout
-   - Docker Swarm, secrets, persistence, and deployment-documentation refinement
-   - Debugging and refactoring for changing calendar inputs from time-limited to all-day events
-   - Documentation updates for grading and reproducibility
+   - Calendar and due-date refactoring
+   - Deployment and repository-compliance cleanup
+   - Documentation refinement for reproducibility
 2. One representative limitation in AI output
-   - AI could suggest a compliant deployment path and make repository changes, but it could not guarantee that the already-running production cluster matched those assumptions. We still had to verify the actual live Swarm state, mounted volume path, and service behavior ourselves. Concrete examples are recorded in `ai-session.md`.
+   - Some AI suggestions were too generic, such as assuming every helper script should stay in the repository or assuming a deployment path without confirming the exact DigitalOcean layout. We still had to trim the repository, confirm which files were actually needed, and verify the real deployment topology ourselves.
 3. How correctness was verified
-   - Backend and frontend builds
-   - `/health` and `/metrics` monitoring endpoint checks
-   - Manual UI inspection of user flow; authentication, project creation, task creation, status updates, and calendar rendering
-   - Swarm service and node inspection for deployment topology and persistence configuration
-   - Monitoring and logs through Prometheus, Grafana, cAdvisor, node-exporter, and container output
+   - Backend and frontend production builds
+   - Manual UI testing of login, project creation, task creation, task updates, and calendar rendering
+   - `/health` and `/metrics` endpoint checks
+   - Swarm, monitoring, and service inspection using container output and dashboards
 
-See `ai-session.md` for the concrete interaction record rather than full prompts or raw responses.
+See `ai-session.md` for 1-3 concrete interaction records.
 
 ## Individual Contributions
 
 - Arooj Ilyas
-  - Led most of the frontend application work, including app routing, dashboard, login/register pages, projects/tasks/calendar pages, layout components, frontend Docker/dev configuration, and repeated README updates.
+  - Led much of the frontend implementation, including routing, dashboard, login and register pages, projects, tasks, calendar pages, layout components, and frontend container configuration.
 - Adam Pietrewicz
-  - Contributed to the backend foundation, including API routing, backend startup wiring, Docker development files, task/project deletion and Compose-based local workflow setup.
+  - Contributed to the backend foundation, including API routing, backend startup wiring, Docker development files, task and project deletion support, and local workflow setup.
 - Patrick Chamaa
-  - Led the DigitalOcean Swarm deployment path, monitoring stack, autoscaler integration, production security/secrets work, calendar and due-date refactor, deployment scripts, and most of the late-stage compliance/documentation updates.
-
-Overall, the frontend, backend, and infrastructure work were distributed across the team, with responsibilities aligning well to the final system architecture.
+  - Led the DigitalOcean Swarm deployment path, monitoring stack, autoscaler integration, production secrets work, calendar and due-date refactor, and final compliance and documentation cleanup.
 
 ## Lessons Learned and Concluding Remarks
 
-This project reinforced that cloud deployment is not just about getting containers to run. The harder and more valuable work was making stateful services reliable, keeping configuration consistent across environments, and verifying that documentation matched the real deployment. We also learned that advanced features such as monitoring, autoscaling, and real-time updates add integration complexity, especially when persistence and security must remain correct at the same time.
+This project reinforced that cloud deployment is not only about getting containers to start. The more difficult work was making stateful services reliable, keeping configuration consistent across environments, and making sure documentation matched the real system. We also learned that advanced features such as monitoring, autoscaling, real-time updates, and secrets management add meaningful integration complexity, especially when persistence and security need to stay correct at the same time.
 
-In conclusion, we learnt a lot building this project. TaskCollab met our main goals: it is a stateful, cloud-native application with a clear user-facing workflow, a reproducible local setup, and a course-compliant Docker Swarm deployment on DigitalOcean. Just as importantly, the project gave us practical experience connecting application development with deployment, observability, persistence, and operational verification.
+TaskCollab met our main goals: it is a stateful, cloud-native application with a clear user workflow, reproducible local setup, and a course-compliant Docker Swarm deployment on DigitalOcean. More importantly, the project gave us practical experience connecting application development with deployment, observability, persistence, and operational verification.
+
+## Video Demo
+
+Add the final 1-5 minute demo URL here before submission.
