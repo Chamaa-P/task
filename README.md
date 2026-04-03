@@ -305,4 +305,21 @@ TaskCollab met our main goals: it is a stateful, cloud-native application with a
 
 ## Video Demo
 
-Add the final 1-5 minute demo URL here before submission.
+https://youtu.be/GFuSYobfW7A
+
+## Autoscaling
+[2026-04-01 14:21:12] taskcollab_backend: 2 replicas | CPU: 3.0% | Memory: 17.9%
+[2026-04-01 14:21:12] taskcollab_backend: SCALE UP from 2 to 3 replicas (usage: 17.9%)
+[2026-04-01 14:21:12] Scaled taskcollab_backend to 3 replicas
+
+[2026-04-01 14:22:13] taskcollab_backend: 3 replicas | CPU: 2.3% | Memory: 16.8%
+[2026-04-01 14:22:13] taskcollab_backend: SCALE DOWN from 3 to 2 replicas (usage: 16.8%)
+[2026-04-01 14:22:13] Scaled taskcollab_backend to 2 replicas
+
+[2026-04-01 14:23:14] taskcollab_backend: 2 replicas | CPU: 2.3% | Memory: 16.6%
+[2026-04-01 14:23:14] taskcollab_backend: SCALE UP from 2 to 3 replicas (usage: 16.6%)
+[2026-04-01 14:23:14] Scaled taskcollab_backend to 3 replicas
+
+[2026-04-01 14:24:14] taskcollab_backend: 3 replicas | CPU: 2.1% | Memory: 16.2%
+[2026-04-01 14:24:14] taskcollab_backend: SCALE DOWN from 3 to 2 replicas (usage: 16.2%)
+[2026-04-01 14:24:15] Scaled taskcollab_backend to 2 replicas
